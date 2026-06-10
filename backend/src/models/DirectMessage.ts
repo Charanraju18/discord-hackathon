@@ -1,16 +1,37 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+export interface IAttachment {
+  url: string;
+  publicId: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  resourceType: string;
+  uploadedAt?: Date;
+}
+
 export interface IDirectMessage extends Document {
   conversationId: mongoose.Types.ObjectId;
   senderId: mongoose.Types.ObjectId;
-  content: string;
+  content?: string;
   isEdited: boolean;
   editedAt?: Date;
   deleted: boolean;
   deletedAt?: Date;
+  attachments: IAttachment[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const AttachmentSchema = new Schema<IAttachment>({
+  url: { type: String, required: true },
+  publicId: { type: String, required: true },
+  fileName: { type: String, required: true },
+  fileSize: { type: Number, required: true },
+  mimeType: { type: String, required: true },
+  resourceType: { type: String, required: true },
+  uploadedAt: { type: Date }
+}, { _id: false });
 
 const DirectMessageSchema = new Schema<IDirectMessage>(
   {
@@ -26,7 +47,6 @@ const DirectMessageSchema = new Schema<IDirectMessage>(
     },
     content: {
       type: String,
-      required: true,
       trim: true,
     },
     isEdited: {
@@ -43,6 +63,10 @@ const DirectMessageSchema = new Schema<IDirectMessage>(
     deletedAt: {
       type: Date,
     },
+    attachments: {
+      type: [AttachmentSchema],
+      default: []
+    }
   },
   { timestamps: true }
 );

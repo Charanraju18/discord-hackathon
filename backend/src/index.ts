@@ -14,6 +14,7 @@ import userRoutes from './routes/user.routes';
 import serverInvitationRoutes from './routes/serverInvitation.routes';
 import friendRoutes from './routes/friend.routes';
 import directMessageRoutes from './routes/directMessage.routes';
+import uploadRoutes from './routes/upload.routes';
 import { Message } from './models/Message';
 
 dotenv.config();
@@ -46,6 +47,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/server-invitations', serverInvitationRoutes);
 app.use('/api/friends', friendRoutes);
 app.use('/api/dms', directMessageRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 // Presence Registries
 const userSockets = new Map<string, Set<string>>(); // userId -> Set of socketIds
@@ -96,10 +98,11 @@ io.on('connection', (socket) => {
   // When a user sends a message
   socket.on('send-message', async (data) => {
     try {
-      const { channelId, content, senderId, username } = data;
+      const { channelId, content, attachments = [], senderId, username } = data;
       
       const message = await Message.create({
         content,
+        attachments,
         senderId,
         channelId,
       });

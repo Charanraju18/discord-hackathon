@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Hash, PlusCircle, Send, Users, Edit2, Trash2, X } from 'lucide-react';
+import { Hash, PlusCircle, Send, Users, Edit2, Trash2, X, File, Loader2 } from 'lucide-react';
 import { useSocket } from '../socket/SocketContext';
 import { useAuth } from '../auth/AuthContext';
 import { MembersSidebar } from '../servers/MembersSidebar';
+import { AttachmentRenderer } from '../../components/messages/AttachmentRenderer';
 import { API_BASE_URL } from '../../config';
 
 export const ChatArea: React.FC = () => {
@@ -16,6 +17,9 @@ export const ChatArea: React.FC = () => {
   const [showMembersMobile, setShowMembersMobile] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { socket } = useSocket();
   const { user } = useAuth();
@@ -154,13 +158,41 @@ export const ChatArea: React.FC = () => {
     }
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !socket || !channelId || !user) return;
+    if ((!message.trim() && pendingFiles.length === 0) || !socket || !channelId || !user || isUploading) return;
+
+    setIsUploading(true);
+    let uploadedAttachments: any[] = [];
+
+    if (pendingFiles.length > 0) {
+      try {
+        const formData = new FormData();
+        pendingFiles.forEach(file => formData.append('attachments', file));
+        
+        const token = localStorage.getItem('token');
+        const res = await axios.post(`${API_BASE_URL}/api/uploads`, formData, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        
+        if (res.data.success) {
+          uploadedAttachments = res.data.data;
+        }
+      } catch (err: any) {
+        console.error('Failed to upload files', err);
+        alert(err.response?.data?.message || 'Failed to upload files. Please try again.');
+        setIsUploading(false);
+        return;
+      }
+    }
 
     socket.emit('send-message', {
       channelId,
       content: message,
+      attachments: uploadedAttachments,
       senderId: user._id,
       username: user.username,
     });
@@ -169,6 +201,18 @@ export const ChatArea: React.FC = () => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
     setMessage('');
+    setPendingFiles([]);
+    setIsUploading(false);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setPendingFiles(Array.from(e.target.files));
+    }
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,10 +303,17 @@ export const ChatArea: React.FC = () => {
                           </div>
                         </form>
                       ) : (
-                        <span className={`text-text-normal break-words leading-relaxed ${msg.deleted ? 'text-text-muted italic' : ''}`}>
-                          {msg.content}
-                          {msg.isEdited && !msg.deleted && <span className="text-[10px] text-text-muted ml-1">(edited)</span>}
-                        </span>
+                        <div className="flex flex-col">
+                          {msg.content && (
+                            <span className={`text-text-normal break-words leading-relaxed ${msg.deleted ? 'text-text-muted italic' : ''}`}>
+                              {msg.content}
+                              {msg.isEdited && !msg.deleted && <span className="text-[10px] text-text-muted ml-1">(edited)</span>}
+                            </span>
+                          )}
+                          {!msg.deleted && msg.attachments && msg.attachments.length > 0 && (
+                            <AttachmentRenderer attachments={msg.attachments} />
+                          )}
+                        </div>
                       )}
                       
                       {/* Hover Actions Toolbar */}
@@ -308,23 +359,62 @@ export const ChatArea: React.FC = () => {
         </div>
 
         {/* Message Input */}
-        <div className="px-4 pb-6 pt-2 shrink-0 relative">
-          <form onSubmit={handleSendMessage} className="bg-channel-bg rounded-lg flex items-center px-4 py-2">
-            <button type="button" className="text-interactive-normal hover:text-interactive-hover mr-4">
+        <div className="px-4 pb-6 pt-2 shrink-0 relative flex flex-col">
+          {pendingFiles.length > 0 && (
+            <div className="bg-[#2b2d31] rounded-t-lg p-4 flex gap-4 overflow-x-auto border-b border-divider">
+              {pendingFiles.map((file, idx) => {
+                const isImage = file.type.startsWith('image/');
+                return (
+                  <div key={idx} className="relative w-40 h-40 bg-[#1e1f22] rounded flex flex-col items-center justify-center p-2 group shrink-0">
+                    <button 
+                      onClick={() => removePendingFile(idx)}
+                      className="absolute -top-2 -right-2 bg-[#f23f42] text-white rounded-full p-1 shadow hover:bg-red-600 z-10"
+                    >
+                      <X size={14} />
+                    </button>
+                    {isImage ? (
+                      <img src={URL.createObjectURL(file)} alt="preview" className="max-h-full max-w-full object-contain rounded" />
+                    ) : (
+                      <div className="flex flex-col items-center text-text-muted text-center">
+                        <File size={32} className="mb-2" />
+                        <span className="text-xs truncate w-full px-2">{file.name}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <form onSubmit={handleSendMessage} className={`bg-channel-bg flex items-center px-4 py-2 ${pendingFiles.length > 0 ? 'rounded-b-lg' : 'rounded-lg'}`}>
+            <input 
+              type="file" 
+              multiple 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleFileSelect} 
+            />
+            <button 
+              type="button" 
+              className="text-interactive-normal hover:text-interactive-hover mr-4"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+            >
               <PlusCircle size={24} />
             </button>
             <input
               type="text"
               value={message}
               onChange={handleTyping}
+              disabled={isUploading}
               placeholder={channel ? `Message #${channel.name}` : `Message`}
-              className="flex-1 bg-transparent text-text-normal focus:outline-none py-1.5"
+              className="flex-1 bg-transparent text-text-normal focus:outline-none py-1.5 disabled:opacity-50"
             />
             <button 
               type="submit" 
-              className={`${message.trim() ? 'text-primary' : 'text-interactive-normal hover:text-interactive-hover'} ml-2 transition-colors`}
+              disabled={isUploading || (!message.trim() && pendingFiles.length === 0)}
+              className={`${message.trim() || pendingFiles.length > 0 ? 'text-primary' : 'text-interactive-normal'} ml-2 transition-colors disabled:opacity-50 flex items-center`}
             >
-              <Send size={20} />
+              {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
             </button>
           </form>
         </div>

@@ -29,14 +29,14 @@ export const editMessage = async (req: Request, res: Response): Promise<void> =>
     const { content } = req.body;
     const userId = (req as any).user.id;
 
-    if (!content || content.trim().length === 0) {
-      res.status(400).json({ success: false, message: 'Message content cannot be empty' });
-      return;
-    }
-
     const message = await Message.findById(id);
     if (!message) {
       res.status(404).json({ success: false, message: 'Message not found' });
+      return;
+    }
+
+    if ((!content || content.trim().length === 0) && message.attachments.length === 0) {
+      res.status(400).json({ success: false, message: 'Message content cannot be empty' });
       return;
     }
 

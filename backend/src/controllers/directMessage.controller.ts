@@ -114,11 +114,11 @@ export const getMessages = async (req: Request, res: Response): Promise<void> =>
 export const sendMessage = async (req: Request, res: Response): Promise<void> => {
   try {
     const { conversationId } = req.params;
-    const { content } = req.body;
+    const { content, attachments = [] } = req.body;
     const userId = (req as any).user.id;
 
-    if (!content || !content.trim()) {
-      res.status(400).json({ success: false, message: 'Message content is required' });
+    if ((!content || !content.trim()) && attachments.length === 0) {
+      res.status(400).json({ success: false, message: 'Message content or attachments are required' });
       return;
     }
 
@@ -131,7 +131,8 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
     const [message] = await DirectMessage.create([{
       conversationId: conversationId as string,
       senderId: userId,
-      content: content.trim()
+      content: content ? content.trim() : undefined,
+      attachments
     }]);
 
     conversation.lastMessageId = message._id as mongoose.Types.ObjectId;
@@ -174,14 +175,14 @@ export const editMessage = async (req: Request, res: Response): Promise<void> =>
     const { content } = req.body;
     const userId = (req as any).user.id;
 
-    if (!content || !content.trim()) {
-      res.status(400).json({ success: false, message: 'Message content is required' });
-      return;
-    }
-
     const message = await DirectMessage.findById(messageId);
     if (!message) {
       res.status(404).json({ success: false, message: 'Message not found' });
+      return;
+    }
+
+    if ((!content || content.trim().length === 0) && message.attachments.length === 0) {
+      res.status(400).json({ success: false, message: 'Message content cannot be empty' });
       return;
     }
 
