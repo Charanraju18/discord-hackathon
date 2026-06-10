@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { InviteLandingPage } from './features/servers/InviteLandingPage';
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { user, loading } = useAuth();
@@ -24,6 +25,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/invite/:code" element={<InviteLandingPage />} />
       <Route path="/channels/*" element={
         <ProtectedRoute>
           <AppLayout />

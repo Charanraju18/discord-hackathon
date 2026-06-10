@@ -17,7 +17,12 @@ export const Login: React.FC = () => {
       const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
       if (res.data.success) {
         login(res.data.data);
-        navigate('/channels/@me');
+        const pendingInvite = localStorage.getItem('pendingInvite');
+        if (pendingInvite) {
+          navigate(`/invite/${pendingInvite}`);
+        } else {
+          navigate('/channels/@me');
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to login');

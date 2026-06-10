@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.routes';
 import serverRoutes from './routes/server.routes';
 import channelRoutes from './routes/channel.routes';
 import messageRoutes from './routes/message.routes';
+import inviteRoutes from './routes/invite.routes';
 import { Message } from './models/Message';
 
 dotenv.config();
@@ -34,6 +35,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/servers', serverRoutes);
 app.use('/api/channels', channelRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/invites', inviteRoutes);
 
 // Presence Registries
 const userSockets = new Map<string, Set<string>>(); // userId -> Set of socketIds
