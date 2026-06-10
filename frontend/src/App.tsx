@@ -37,14 +37,17 @@ function AppRoutes() {
 }
 
 import { SocketProvider } from './features/socket/SocketContext';
+import { NotificationProvider } from './features/notifications/NotificationContext';
 
 function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <Router>
-          <AppRoutes />
-        </Router>
+        <NotificationProvider>
+          <Router>
+            <AppRoutes />
+          </Router>
+        </NotificationProvider>
       </SocketProvider>
     </AuthProvider>
   );

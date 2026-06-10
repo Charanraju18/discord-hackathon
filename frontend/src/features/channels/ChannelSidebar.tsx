@@ -5,7 +5,6 @@ import { Hash, Plus, Settings, UserPlus, ChevronDown } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { InviteModal } from '../servers/InviteModal';
 import { UserInviteModal } from '../invitations/UserInviteModal';
-import { NotificationCenter } from '../invitations/NotificationCenter';
 import { API_BASE_URL } from '../../config';
 
 export const ChannelSidebar: React.FC = () => {
@@ -72,7 +71,7 @@ export const ChannelSidebar: React.FC = () => {
   };
 
   return (
-    <div className="w-60 bg-channel-bg flex flex-col h-full shrink-0">
+    <div className="flex flex-col h-full w-full bg-channel-bg">
       {/* Server Header */}
       <div className="h-12 border-b border-divider flex items-center justify-between px-4 font-bold text-white shadow-sm cursor-pointer hover:bg-white/5 transition-colors group">
         <span className="truncate">{server ? server.name : 'Server'}</span>
@@ -109,25 +108,7 @@ export const ChannelSidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* User Area */}
-      <div className="h-[52px] bg-[#232428] flex items-center px-2 shrink-0">
-        <div className="flex items-center hover:bg-white/10 p-1 rounded cursor-pointer transition-colors flex-1">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold mr-2 relative">
-            {user?.username?.charAt(0).toUpperCase()}
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-[#23a559] rounded-full border-2 border-[#232428]"></div>
-          </div>
-          <div className="flex flex-col truncate">
-            <span className="text-sm font-bold text-white leading-tight truncate">{user?.username}</span>
-            <span className="text-xs text-text-muted leading-tight truncate">Online</span>
-          </div>
-        </div>
-        <div className="flex items-center space-x-1">
-          <NotificationCenter />
-          <button className="w-8 h-8 flex items-center justify-center text-text-muted hover:text-text-normal hover:bg-white/10 rounded">
-            <Settings size={20} />
-          </button>
-        </div>
-      </div>
+      {/* The User Area has been moved to UserPanel.tsx in SecondarySidebarLayout */}
 
       {/* Create Channel Modal */}
       {showChannelModal && (

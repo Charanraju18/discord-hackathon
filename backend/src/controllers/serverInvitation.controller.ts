@@ -64,7 +64,11 @@ export const inviteUser = async (req: Request, res: Response): Promise<void> => 
     // Emit real-time notification
     const io = req.app.get('io');
     if (io) {
-      io.to(receiverId).emit('invitation-received', populatedInvitation);
+      io.to(receiverId).emit('notification-created', {
+        type: 'server_invitation',
+        data: populatedInvitation,
+        createdAt: invitation.createdAt
+      });
     }
 
     res.status(201).json({ success: true, data: populatedInvitation });

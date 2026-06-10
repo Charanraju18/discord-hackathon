@@ -12,6 +12,7 @@ import messageRoutes from './routes/message.routes';
 import inviteRoutes from './routes/invite.routes';
 import userRoutes from './routes/user.routes';
 import serverInvitationRoutes from './routes/serverInvitation.routes';
+import friendRoutes from './routes/friend.routes';
 import { Message } from './models/Message';
 
 dotenv.config();
@@ -41,7 +42,8 @@ app.use('/api/channels', channelRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/invitations', serverInvitationRoutes);
+app.use('/api/server-invitations', serverInvitationRoutes);
+app.use('/api/friends', friendRoutes);
 
 // Presence Registries
 const userSockets = new Map<string, Set<string>>(); // userId -> Set of socketIds

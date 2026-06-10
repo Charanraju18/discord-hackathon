@@ -4,18 +4,42 @@ import axios from 'axios';
 import { ServerSidebar } from '../features/servers/ServerSidebar';
 import { ChannelSidebar } from '../features/channels/ChannelSidebar';
 import { ChatArea } from '../features/chat/ChatArea';
-import { useAuth } from '../features/auth/AuthContext';
 import { API_BASE_URL } from '../config';
+import { SecondarySidebarLayout } from './SecondarySidebarLayout';
+import { FriendsSidebar } from '../features/friends/FriendsSidebar';
+import { FriendsDashboard } from '../features/friends/FriendsDashboard';
 
 const ServerLayout = () => (
   <>
-    <ChannelSidebar />
+    <SecondarySidebarLayout>
+      <ChannelSidebar />
+    </SecondarySidebarLayout>
     <Outlet />
   </>
 );
 
+const MeLayout = () => {
+  const [activeTab, setActiveTab] = useState('online');
+  const [pendingCount, setPendingCount] = useState(0);
+
+  return (
+    <>
+      <SecondarySidebarLayout>
+        <FriendsSidebar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          pendingCount={pendingCount} 
+        />
+      </SecondarySidebarLayout>
+      <FriendsDashboard 
+        activeTab={activeTab} 
+        onCountsUpdate={setPendingCount} 
+      />
+    </>
+  );
+};
+
 export const AppLayout: React.FC = () => {
-  const { user } = useAuth();
   const [servers, setServers] = useState<any[]>([]);
 
   useEffect(() => {
@@ -40,14 +64,7 @@ export const AppLayout: React.FC = () => {
       <ServerSidebar servers={servers} onServerCreated={(s) => setServers([...servers, s])} />
 
       <Routes>
-        <Route path="@me" element={
-          <div className="flex-1 flex items-center justify-center bg-channel-bg">
-            <div className="text-center">
-              <h2 className="text-xl font-bold text-white mb-2">Welcome, {user?.username}</h2>
-              <p className="text-text-muted">Select a server or create one to start chatting!</p>
-            </div>
-          </div>
-        } />
+        <Route path="@me" element={<MeLayout />} />
         
         <Route path=":serverId" element={<ServerLayout />}>
           <Route path="" element={<div className="flex-1 bg-background flex items-center justify-center text-text-muted">Select a channel</div>} />
