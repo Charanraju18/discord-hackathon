@@ -253,111 +253,109 @@ export const ChatArea: React.FC = () => {
 
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto px-4 pt-4 pb-2 custom-scrollbar flex flex-col">
-          <div className="mt-auto flex flex-col justify-end min-h-full">
-            <div className="text-left text-text-muted mt-8 mb-4">
-              <div className="w-16 h-16 bg-server-bg rounded-full flex items-center justify-center mb-4">
-                <Hash size={32} className="text-white" />
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-2">Welcome to {channel ? `#${channel.name}` : 'the channel'}!</h1>
-              <p>This is the start of the #{channel ? channel.name : 'channel'} conversation.</p>
+          <div className="text-left text-text-muted mt-8 mb-4">
+            <div className="w-16 h-16 bg-server-bg rounded-full flex items-center justify-center mb-4">
+              <Hash size={32} className="text-white" />
             </div>
+            <h1 className="text-3xl font-bold text-white mb-2">Welcome to {channel ? `#${channel.name}` : 'the channel'}!</h1>
+            <p>This is the start of the #{channel ? channel.name : 'channel'} conversation.</p>
+          </div>
 
-            <div className="flex flex-col space-y-4">
-              {messages.map((msg, idx) => {
-                const isSameSenderAsPrev = idx > 0 && messages[idx - 1].senderId?._id === msg.senderId?._id;
-                
-                return (
-                  <div key={msg._id} className={`flex items-start ${isSameSenderAsPrev ? 'mt-1' : 'mt-4'} hover:bg-white/5 -mx-4 px-4 py-0.5 group`}>
-                    {!isSameSenderAsPrev ? (
-                      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold mr-4 shrink-0 mt-0.5">
-                        {msg.senderId?.username?.charAt(0).toUpperCase()}
-                      </div>
-                    ) : (
-                      <div className="w-10 mr-4 shrink-0 text-xs text-text-muted opacity-0 group-hover:opacity-100 text-center leading-5">
-                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          <div className="flex flex-col space-y-4">
+            {messages.map((msg, idx) => {
+              const isSameSenderAsPrev = idx > 0 && messages[idx - 1].senderId?._id === msg.senderId?._id;
+              
+              return (
+                <div key={msg._id} className={`flex items-start ${isSameSenderAsPrev ? 'mt-1' : 'mt-4'} hover:bg-white/5 -mx-4 px-4 py-0.5 group`}>
+                  {!isSameSenderAsPrev ? (
+                    <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold mr-4 shrink-0 mt-0.5">
+                      {msg.senderId?.username?.charAt(0).toUpperCase()}
+                    </div>
+                  ) : (
+                    <div className="w-10 mr-4 shrink-0 text-xs text-text-muted opacity-0 group-hover:opacity-100 text-center leading-5">
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-col flex-1 min-w-0 relative">
+                    {!isSameSenderAsPrev && (
+                      <div className="flex items-baseline">
+                        <span className="font-medium text-white mr-2 hover:underline cursor-pointer">{msg.senderId?.username}</span>
+                        <span className="text-xs text-text-muted">
+                          {new Date(msg.createdAt).toLocaleDateString()} {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
                     )}
                     
-                    <div className="flex flex-col flex-1 min-w-0 relative">
-                      {!isSameSenderAsPrev && (
-                        <div className="flex items-baseline">
-                          <span className="font-medium text-white mr-2 hover:underline cursor-pointer">{msg.senderId?.username}</span>
-                          <span className="text-xs text-text-muted">
-                            {new Date(msg.createdAt).toLocaleDateString()} {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {editingMessageId === msg._id ? (
+                      <form onSubmit={(e) => handleEditSubmit(e, msg._id)} className="mt-1 flex flex-col">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') setEditingMessageId(null);
+                          }}
+                          className="w-full bg-[#383a40] text-text-normal p-2 rounded border border-transparent focus:outline-none focus:border-[#00a8fc]"
+                        />
+                        <div className="text-xs mt-1">
+                          escape to <span className="text-blue-400 cursor-pointer hover:underline" onClick={() => setEditingMessageId(null)}>cancel</span> • enter to <span className="text-blue-400 cursor-pointer hover:underline" onClick={(e) => handleEditSubmit(e as any, msg._id)}>save</span>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="flex flex-col">
+                        {msg.content && (
+                          <span className={`text-text-normal break-words leading-relaxed ${msg.deleted ? 'text-text-muted italic' : ''}`}>
+                            {msg.content}
+                            {msg.isEdited && !msg.deleted && <span className="text-[10px] text-text-muted ml-1">(edited)</span>}
                           </span>
-                        </div>
-                      )}
-                      
-                      {editingMessageId === msg._id ? (
-                        <form onSubmit={(e) => handleEditSubmit(e, msg._id)} className="mt-1 flex flex-col">
-                          <input
-                            autoFocus
-                            type="text"
-                            value={editContent}
-                            onChange={(e) => setEditContent(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Escape') setEditingMessageId(null);
-                            }}
-                            className="w-full bg-[#383a40] text-text-normal p-2 rounded border border-transparent focus:outline-none focus:border-[#00a8fc]"
-                          />
-                          <div className="text-xs mt-1">
-                            escape to <span className="text-blue-400 cursor-pointer hover:underline" onClick={() => setEditingMessageId(null)}>cancel</span> • enter to <span className="text-blue-400 cursor-pointer hover:underline" onClick={(e) => handleEditSubmit(e as any, msg._id)}>save</span>
-                          </div>
-                        </form>
-                      ) : (
-                        <div className="flex flex-col">
-                          {msg.content && (
-                            <span className={`text-text-normal break-words leading-relaxed ${msg.deleted ? 'text-text-muted italic' : ''}`}>
-                              {msg.content}
-                              {msg.isEdited && !msg.deleted && <span className="text-[10px] text-text-muted ml-1">(edited)</span>}
-                            </span>
-                          )}
-                          {!msg.deleted && msg.attachments && msg.attachments.length > 0 && (
-                            <AttachmentRenderer attachments={msg.attachments} />
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Hover Actions Toolbar */}
-                      {user?._id === msg.senderId?._id && !msg.deleted && editingMessageId !== msg._id && (
-                        <div className="absolute right-0 -top-4 opacity-0 group-hover:opacity-100 bg-[#313338] border border-divider shadow-sm rounded flex items-center overflow-hidden transition-opacity">
-                          <button 
-                            className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors"
-                            onClick={() => {
-                              setEditingMessageId(msg._id);
-                              setEditContent(msg.content);
-                            }}
-                            title="Edit"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            className="p-1.5 text-red-500 hover:text-red-400 hover:bg-white/10 transition-colors"
-                            onClick={() => handleDeleteMessage(msg._id)}
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                        {!msg.deleted && msg.attachments && msg.attachments.length > 0 && (
+                          <AttachmentRenderer attachments={msg.attachments} />
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Hover Actions Toolbar */}
+                    {user?._id === msg.senderId?._id && !msg.deleted && editingMessageId !== msg._id && (
+                      <div className="absolute right-0 -top-4 opacity-0 group-hover:opacity-100 bg-[#313338] border border-divider shadow-sm rounded flex items-center overflow-hidden transition-opacity">
+                        <button 
+                          className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors"
+                          onClick={() => {
+                            setEditingMessageId(msg._id);
+                            setEditContent(msg.content);
+                          }}
+                          title="Edit"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          className="p-1.5 text-red-500 hover:text-red-400 hover:bg-white/10 transition-colors"
+                          onClick={() => handleDeleteMessage(msg._id)}
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-            
-            {typingUsers.size > 0 && (
-              <div className="text-xs text-text-muted mt-2 font-medium flex items-center h-4">
-                <span className="flex gap-1 mr-2">
-                  <span className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce"></span>
-                  <span className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
-                  <span className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
-                </span>
-                {Array.from(typingUsers).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
-              </div>
-            )}
-            <div ref={messagesEndRef} />
+                </div>
+              );
+            })}
           </div>
+            
+          {typingUsers.size > 0 && (
+            <div className="text-xs text-text-muted mt-2 font-medium flex items-center h-4">
+              <span className="flex gap-1 mr-2">
+                <span className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce"></span>
+                <span className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                <span className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+              </span>
+              {Array.from(typingUsers).join(', ')} {typingUsers.size === 1 ? 'is' : 'are'} typing...
+            </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Message Input */}

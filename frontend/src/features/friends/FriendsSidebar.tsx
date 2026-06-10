@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { User, Users, Clock, UserPlus } from 'lucide-react';
 
 interface FriendsSidebarProps {
@@ -8,12 +9,24 @@ interface FriendsSidebarProps {
 }
 
 export const FriendsSidebar: React.FC<FriendsSidebarProps> = ({ activeTab, setActiveTab, pendingCount = 0 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const tabs = [
     { id: 'online', label: 'Online', icon: <User size={20} /> },
     { id: 'all', label: 'All Friends', icon: <Users size={20} /> },
     { id: 'pending', label: 'Pending', icon: <Clock size={20} />, badge: pendingCount },
     { id: 'add', label: 'Add Friend', icon: <UserPlus size={20} /> },
   ];
+
+  const handleTabClick = (tabId: string) => {
+    setActiveTab(tabId);
+    if (location.pathname !== '/channels/@me') {
+      navigate('/channels/@me');
+    }
+  };
+
+  const isDashboard = location.pathname === '/channels/@me';
 
   return (
     <div className="flex flex-col w-full bg-channel-bg">
@@ -27,9 +40,9 @@ export const FriendsSidebar: React.FC<FriendsSidebarProps> = ({ activeTab, setAc
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabClick(tab.id)}
             className={`w-full flex items-center justify-between px-2 py-2 rounded transition-colors group ${
-              activeTab === tab.id
+              isDashboard && activeTab === tab.id
                 ? 'bg-white/10 text-interactive-active'
                 : 'text-text-muted hover:bg-white/5 hover:text-interactive-hover'
             }`}

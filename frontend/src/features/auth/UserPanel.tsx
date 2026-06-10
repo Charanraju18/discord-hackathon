@@ -1,13 +1,25 @@
-import React from 'react';
-import { Settings } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Settings, LogOut } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 
 export const UserPanel: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const [showSettings, setShowSettings] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
-    <div className="h-[52px] bg-[#232428] flex items-center px-2 shrink-0">
+    <div className="h-[52px] bg-[#232428] flex items-center px-2 shrink-0 relative">
       <div className="flex items-center hover:bg-white/10 p-1 rounded cursor-pointer transition-colors flex-1 min-w-0">
         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold mr-2 relative shrink-0">
           {user?.username?.charAt(0).toUpperCase()}
@@ -20,9 +32,31 @@ export const UserPanel: React.FC = () => {
       </div>
       <div className="flex items-center space-x-1 shrink-0">
         <NotificationCenter />
-        <button className="w-8 h-8 flex items-center justify-center text-text-muted hover:text-text-normal hover:bg-white/10 rounded transition-colors">
-          <Settings size={20} />
-        </button>
+        <div className="relative" ref={dropdownRef}>
+          <button 
+            onClick={() => setShowSettings(!showSettings)}
+            className="w-8 h-8 flex items-center justify-center text-text-muted hover:text-text-normal hover:bg-white/10 rounded transition-colors"
+          >
+            <Settings size={20} />
+          </button>
+          
+          {showSettings && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 bg-[#1e1f22] rounded shadow-xl border border-divider overflow-hidden z-50">
+              <div className="p-1">
+                <button 
+                  onClick={() => {
+                    setShowSettings(false);
+                    logout();
+                  }}
+                  className="w-full flex items-center px-2 py-2 text-sm text-[#f23f42] hover:bg-[#f23f42] hover:text-white rounded transition-colors group"
+                >
+                  <LogOut size={16} className="mr-2 opacity-80 group-hover:opacity-100" />
+                  Log Out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
