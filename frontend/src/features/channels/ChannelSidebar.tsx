@@ -4,13 +4,16 @@ import axios from 'axios';
 import { Hash, Plus, Settings, UserPlus, ChevronDown } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { InviteModal } from '../servers/InviteModal';
+import { UserInviteModal } from '../invitations/UserInviteModal';
+import { NotificationCenter } from '../invitations/NotificationCenter';
+import { API_BASE_URL } from '../../config';
 
 export const ChannelSidebar: React.FC = () => {
   const { serverId } = useParams<{ serverId: string }>();
   const [channels, setChannels] = useState<any[]>([]);
   const [server, setServer] = useState<any>(null);
   const [showChannelModal, setShowChannelModal] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showUserInviteModal, setShowUserInviteModal] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -19,7 +22,7 @@ export const ChannelSidebar: React.FC = () => {
     const fetchChannels = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get(`http://localhost:5000/api/channels/${serverId}`, {
+        const res = await axios.get(`${API_BASE_URL}/api/channels/${serverId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.data.success) {
@@ -34,7 +37,7 @@ export const ChannelSidebar: React.FC = () => {
     const fetchServer = async () => {
        try {
           const token = localStorage.getItem('token');
-          const res = await axios.get(`http://localhost:5000/api/servers`, {
+          const res = await axios.get(`${API_BASE_URL}/api/servers`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (res.data.success) {
@@ -54,7 +57,7 @@ export const ChannelSidebar: React.FC = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post('http://localhost:5000/api/channels', 
+      const res = await axios.post(`${API_BASE_URL}/api/channels`, 
         { name: newChannelName, serverId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -76,7 +79,7 @@ export const ChannelSidebar: React.FC = () => {
         <button 
           onClick={(e) => {
              e.stopPropagation();
-             setShowInviteModal(true);
+             setShowUserInviteModal(true);
           }}
           className="text-text-muted hover:text-white transition-colors p-1 flex items-center justify-center rounded"
           title="Invite People"
@@ -118,7 +121,8 @@ export const ChannelSidebar: React.FC = () => {
             <span className="text-xs text-text-muted leading-tight truncate">Online</span>
           </div>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center space-x-1">
+          <NotificationCenter />
           <button className="w-8 h-8 flex items-center justify-center text-text-muted hover:text-text-normal hover:bg-white/10 rounded">
             <Settings size={20} />
           </button>
@@ -161,12 +165,12 @@ export const ChannelSidebar: React.FC = () => {
         </div>
       )}
 
-      {/* Invite Modal */}
-      {showInviteModal && server && (
-        <InviteModal 
+      {/* User Invite Modal */}
+      {showUserInviteModal && server && (
+        <UserInviteModal 
           serverId={server._id} 
           serverName={server.name} 
-          onClose={() => setShowInviteModal(false)} 
+          onClose={() => setShowUserInviteModal(false)} 
         />
       )}
     </div>

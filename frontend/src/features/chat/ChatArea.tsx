@@ -5,10 +5,12 @@ import { Hash, PlusCircle, Send, Users } from 'lucide-react';
 import { useSocket } from '../socket/SocketContext';
 import { useAuth } from '../auth/AuthContext';
 import { MembersSidebar } from '../servers/MembersSidebar';
+import { API_BASE_URL } from '../../config';
 
 export const ChatArea: React.FC = () => {
   const { channelId, serverId } = useParams<{ channelId: string; serverId: string }>();
   const [messages, setMessages] = useState<any[]>([]);
+  const [channel, setChannel] = useState<any>(null);
   const [message, setMessage] = useState('');
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [showMembersMobile, setShowMembersMobile] = useState(false);
@@ -26,22 +28,35 @@ export const ChatArea: React.FC = () => {
   }, [messages, typingUsers]);
 
   useEffect(() => {
-    const fetchMessages = async () => {
-      if (!channelId) return;
+    const fetchMessagesAndChannel = async () => {
+      if (!channelId || !serverId) return;
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get(`http://localhost:5000/api/messages/${channelId}`, {
+        
+        // Fetch messages
+        const messagesRes = await axios.get(`${API_BASE_URL}/api/messages/${channelId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (res.data.success) {
-          setMessages(res.data.data);
+        if (messagesRes.data.success) {
+          setMessages(messagesRes.data.data);
+        }
+
+        // Fetch channel name by fetching channels for this server
+        const channelsRes = await axios.get(`${API_BASE_URL}/api/channels/${serverId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (channelsRes.data.success) {
+          const currentChannel = channelsRes.data.data.find((c: any) => c._id === channelId);
+          if (currentChannel) {
+            setChannel(currentChannel);
+          }
         }
       } catch (err) {
-        console.error('Failed to fetch messages', err);
+        console.error('Failed to fetch chat data', err);
       }
     };
 
-    fetchMessages();
+    fetchMessagesAndChannel();
 
     if (socket && channelId) {
       socket.emit('join-channel', { channelId });
@@ -122,7 +137,7 @@ export const ChatArea: React.FC = () => {
         <div className="h-12 border-b border-divider flex items-center justify-between px-4 shrink-0 shadow-sm">
           <div className="flex items-center">
             <Hash size={24} className="text-text-muted mr-2" />
-            <h3 className="font-bold text-white">channel</h3>
+            <h3 className="font-bold text-white truncate">{channel ? channel.name : 'channel'}</h3>
           </div>
           <div className="flex items-center">
             {/* Members Toggle Button for Mobile and Desktop */}
@@ -142,8 +157,8 @@ export const ChatArea: React.FC = () => {
               <div className="w-16 h-16 bg-server-bg rounded-full flex items-center justify-center mb-4">
                 <Hash size={32} className="text-white" />
               </div>
-              <h1 className="text-3xl font-bold text-white mb-2">Welcome to the channel!</h1>
-              <p>This is the start of the conversation.</p>
+              <h1 className="text-3xl font-bold text-white mb-2">Welcome to {channel ? `#${channel.name}` : 'the channel'}!</h1>
+              <p>This is the start of the #{channel ? channel.name : 'channel'} conversation.</p>
             </div>
 
             <div className="flex flex-col space-y-4">
@@ -202,7 +217,7 @@ export const ChatArea: React.FC = () => {
               type="text"
               value={message}
               onChange={handleTyping}
-              placeholder={`Message`}
+              placeholder={channel ? `Message #${channel.name}` : `Message`}
               className="flex-1 bg-transparent text-text-normal focus:outline-none py-1.5"
             />
             <button 

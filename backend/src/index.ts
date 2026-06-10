@@ -10,6 +10,8 @@ import serverRoutes from './routes/server.routes';
 import channelRoutes from './routes/channel.routes';
 import messageRoutes from './routes/message.routes';
 import inviteRoutes from './routes/invite.routes';
+import userRoutes from './routes/user.routes';
+import serverInvitationRoutes from './routes/serverInvitation.routes';
 import { Message } from './models/Message';
 
 dotenv.config();
@@ -26,6 +28,8 @@ const io = new Server(server, {
   },
 });
 
+app.set('io', io);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -36,6 +40,8 @@ app.use('/api/servers', serverRoutes);
 app.use('/api/channels', channelRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/invites', inviteRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/invitations', serverInvitationRoutes);
 
 // Presence Registries
 const userSockets = new Map<string, Set<string>>(); // userId -> Set of socketIds
@@ -68,6 +74,7 @@ io.on('connection', (socket) => {
   console.log(`User connected: ${userId} on socket ${socket.id}`);
 
   // Register Presence
+  socket.join(userId);
   if (!userSockets.has(userId)) {
     userSockets.set(userId, new Set());
   }

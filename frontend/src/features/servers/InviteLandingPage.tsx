@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Hash } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { API_BASE_URL } from '../../config';
 
 export const InviteLandingPage: React.FC = () => {
   const { code } = useParams<{ code: string }>();
@@ -17,7 +18,7 @@ export const InviteLandingPage: React.FC = () => {
   useEffect(() => {
     const fetchInvite = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/invites/${code}`);
+        const res = await axios.get(`${API_BASE_URL}/api/invites/${code}`);
         if (res.data.success) {
           setInviteData(res.data.data);
         }
@@ -50,7 +51,7 @@ export const InviteLandingPage: React.FC = () => {
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post(`http://localhost:5000/api/invites/${code}/join`, {}, {
+      const res = await axios.post(`${API_BASE_URL}/api/invites/${code}/join`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

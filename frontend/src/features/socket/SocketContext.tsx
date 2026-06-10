@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../auth/AuthContext';
+import { API_BASE_URL } from '../../config';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -22,7 +23,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const newSocket = io('http://localhost:5000', {
+    const newSocket = io(`${API_BASE_URL}`, {
       auth: {
         token
       }

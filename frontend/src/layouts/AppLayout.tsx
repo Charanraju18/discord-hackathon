@@ -5,6 +5,7 @@ import { ServerSidebar } from '../features/servers/ServerSidebar';
 import { ChannelSidebar } from '../features/channels/ChannelSidebar';
 import { ChatArea } from '../features/chat/ChatArea';
 import { useAuth } from '../features/auth/AuthContext';
+import { API_BASE_URL } from '../config';
 
 const ServerLayout = () => (
   <>
@@ -21,7 +22,7 @@ export const AppLayout: React.FC = () => {
     const fetchServers = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/servers', {
+        const res = await axios.get(`${API_BASE_URL}/api/servers`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.data.success) {

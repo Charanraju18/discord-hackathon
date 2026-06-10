@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { X, Copy, Check } from 'lucide-react';
+import { API_BASE_URL } from '../../config';
 
 interface InviteModalProps {
   serverId: string;
@@ -20,7 +21,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({ serverId, serverName, 
     try {
       const token = localStorage.getItem('token');
       const res = await axios.post(
-        `http://localhost:5000/api/servers/${serverId}/invites`,
+        `${API_BASE_URL}/api/servers/${serverId}/invites`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );

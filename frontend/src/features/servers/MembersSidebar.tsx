@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Crown } from 'lucide-react';
 import { useSocket } from '../socket/SocketContext';
+import { API_BASE_URL } from '../../config';
 
 interface Member {
   _id: string;
@@ -24,7 +25,7 @@ export const MembersSidebar: React.FC<MembersSidebarProps> = ({ serverId, isOpen
     const fetchMembers = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get(`http://localhost:5000/api/servers/${serverId}/members`, {
+        const res = await axios.get(`${API_BASE_URL}/api/servers/${serverId}/members`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.data.success) {

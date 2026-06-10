@@ -70,7 +70,7 @@ export const createInvite = async (req: Request, res: Response): Promise<void> =
       serverId,
       createdBy: userId,
       expiresAt,
-    });
+    } as any);
 
     res.status(201).json({ success: true, data: newInvite });
   } catch (error) {

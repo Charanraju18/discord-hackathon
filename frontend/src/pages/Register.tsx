@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../features/auth/AuthContext';
+import { API_BASE_URL } from '../config';
 
 export const Register: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -15,7 +16,7 @@ export const Register: React.FC = () => {
     e.preventDefault();
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/register', { email, username, password });
+      const res = await axios.post(`${API_BASE_URL}/api/auth/register`, { email, username, password });
       if (res.data.success) {
         login(res.data.data);
         const pendingInvite = localStorage.getItem('pendingInvite');

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import axios from 'axios';
 import { Plus } from 'lucide-react';
+import { API_BASE_URL } from '../../config';
 
 interface ServerSidebarProps {
   servers: any[];
@@ -16,7 +17,7 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({ servers, onServerC
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post('http://localhost:5000/api/servers', 
+      const res = await axios.post(`${API_BASE_URL}/api/servers`, 
         { name: newServerName },
         { headers: { Authorization: `Bearer ${token}` } }
       );
