@@ -6,7 +6,7 @@ import { API_BASE_URL } from '../../config';
 
 export const DirectMessagesSidebar: React.FC = () => {
   const [conversations, setConversations] = useState<any[]>([]);
-  const { onlineUsers, socket } = useSocket();
+  const { onlineUsers, socket, presenceOverrides } = useSocket();
 
   const fetchConversations = async () => {
     try {
@@ -50,7 +50,9 @@ export const DirectMessagesSidebar: React.FC = () => {
             {conversations.map((conv) => {
               const friend = conv.friend;
               if (!friend) return null;
-              const isOnline = onlineUsers.includes(friend._id);
+              
+              const isOverride = presenceOverrides[friend._id];
+              const isOnline = isOverride !== undefined ? isOverride : (onlineUsers.includes(friend._id) || friend.isOnline);
 
               return (
                 <NavLink

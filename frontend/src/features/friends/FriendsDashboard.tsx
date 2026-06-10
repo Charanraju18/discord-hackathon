@@ -18,7 +18,7 @@ export const FriendsDashboard: React.FC<FriendsDashboardProps> = ({ activeTab, o
   const [outgoing, setOutgoing] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const { onlineUsers } = useSocket();
+  const { onlineUsers, presenceOverrides } = useSocket();
 
   const fetchFriendsAndRequests = async () => {
     try {
@@ -29,10 +29,14 @@ export const FriendsDashboard: React.FC<FriendsDashboardProps> = ({ activeTab, o
       ]);
 
       if (friendsRes.data.success) {
-        const mappedFriends = friendsRes.data.data.map((f: any) => ({
-          ...f,
-          status: onlineUsers.includes(f._id) ? 'online' : 'offline'
-        }));
+        const mappedFriends = friendsRes.data.data.map((f: any) => {
+          const isOverride = presenceOverrides[f._id];
+          const isOnlineNow = isOverride !== undefined ? isOverride : (f.isOnline || onlineUsers.includes(f._id));
+          return {
+            ...f,
+            status: isOnlineNow ? 'online' : 'offline'
+          };
+        });
         setFriends(mappedFriends);
       }
       if (requestsRes.data.success) {
@@ -53,11 +57,15 @@ export const FriendsDashboard: React.FC<FriendsDashboardProps> = ({ activeTab, o
 
   // Update online status in real-time
   useEffect(() => {
-    setFriends(prev => prev.map(f => ({
-      ...f,
-      status: onlineUsers.includes(f._id) ? 'online' : 'offline'
-    })));
-  }, [onlineUsers]);
+    setFriends(prev => prev.map(f => {
+      const isOverride = presenceOverrides[f._id];
+      const isOnlineNow = isOverride !== undefined ? isOverride : (f.isOnline || onlineUsers.includes(f._id));
+      return {
+        ...f,
+        status: isOnlineNow ? 'online' : 'offline'
+      };
+    }));
+  }, [onlineUsers, presenceOverrides]);
 
   const handleAccept = async (requestId: string) => {
     setActionLoading(requestId);

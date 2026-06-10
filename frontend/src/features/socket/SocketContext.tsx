@@ -7,6 +7,7 @@ interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
   onlineUsers: string[];
+  presenceOverrides: Record<string, boolean>;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -16,6 +17,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [presenceOverrides, setPresenceOverrides] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!user) return;
@@ -34,11 +36,28 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     newSocket.on('online-users', (users: string[]) => {
-      setOnlineUsers(users);
+      setOnlineUsers(users); // Keep legacy full sync just in case
+    });
+
+    newSocket.on('user:online', ({ userId }: { userId: string }) => {
+      setOnlineUsers(prev => {
+        if (!prev.includes(userId)) {
+          return [...prev, userId];
+        }
+        return prev;
+      });
+      setPresenceOverrides(prev => ({ ...prev, [userId]: true }));
+    });
+
+    newSocket.on('user:offline', ({ userId }: { userId: string }) => {
+      setOnlineUsers(prev => prev.filter(id => id !== userId));
+      setPresenceOverrides(prev => ({ ...prev, [userId]: false }));
     });
 
     newSocket.on('disconnect', () => {
       setIsConnected(false);
+      setOnlineUsers([]);
+      setPresenceOverrides({});
     });
 
     setSocket(newSocket);
@@ -49,7 +68,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [user]);
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected, onlineUsers }}>
+    <SocketContext.Provider value={{ socket, isConnected, onlineUsers, presenceOverrides }}>
       {children}
     </SocketContext.Provider>
   );

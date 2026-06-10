@@ -16,6 +16,8 @@ import friendRoutes from './routes/friend.routes';
 import directMessageRoutes from './routes/directMessage.routes';
 import uploadRoutes from './routes/upload.routes';
 import { Message } from './models/Message';
+import { User } from './models/User';
+import { Friendship } from './models/Friendship';
 
 dotenv.config();
 
@@ -75,19 +77,37 @@ io.use((socket, next) => {
 });
 
 // Socket.IO Events
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   const userId = (socket as any).userId;
   console.log(`User connected: ${userId} on socket ${socket.id}`);
 
   // Register Presence
-  socket.join(userId);
+  socket.join(userId); // Legacy, keep if used elsewhere
+  socket.join(`user:${userId}`); // Specific user room
+  
   if (!userSockets.has(userId)) {
     userSockets.set(userId, new Set());
   }
+  const isFirstConnection = userSockets.get(userId)!.size === 0;
   userSockets.get(userId)!.add(socket.id);
   socketUser.set(socket.id, userId);
 
-  // Broadcast updated presence
+  if (isFirstConnection) {
+    try {
+      await User.findByIdAndUpdate(userId, { isOnline: true });
+      const friendships = await Friendship.find({
+        $or: [{ userOneId: userId }, { userTwoId: userId }]
+      });
+      friendships.forEach(f => {
+        const friendId = f.userOneId.toString() === userId ? f.userTwoId.toString() : f.userOneId.toString();
+        io.to(`user:${friendId}`).emit('user:online', { userId });
+      });
+    } catch (err) {
+      console.error('Error handling first connection presence:', err);
+    }
+  }
+
+  // Broadcast updated presence globally (legacy)
   broadcastOnlineUsers();
 
   // When a user joins a channel
@@ -137,7 +157,7 @@ io.on('connection', (socket) => {
     socket.to(`dm:${conversationId}`).emit('dm:stop-typing', { conversationId, username });
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     console.log(`User disconnected: socket ${socket.id}`);
     
     const uid = socketUser.get(socket.id);
@@ -147,6 +167,19 @@ io.on('connection', (socket) => {
         sockets.delete(socket.id);
         if (sockets.size === 0) {
           userSockets.delete(uid);
+          
+          try {
+            await User.findByIdAndUpdate(uid, { isOnline: false, lastSeen: new Date() });
+            const friendships = await Friendship.find({
+              $or: [{ userOneId: uid }, { userTwoId: uid }]
+            });
+            friendships.forEach(f => {
+              const friendId = f.userOneId.toString() === uid ? f.userTwoId.toString() : f.userOneId.toString();
+              io.to(`user:${friendId}`).emit('user:offline', { userId: uid });
+            });
+          } catch (err) {
+            console.error('Error handling last disconnect presence:', err);
+          }
         }
       }
       socketUser.delete(socket.id);

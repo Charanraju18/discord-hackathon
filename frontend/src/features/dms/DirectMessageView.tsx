@@ -20,7 +20,7 @@ export const DirectMessageView: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { socket, onlineUsers } = useSocket();
+  const { socket, onlineUsers, presenceOverrides } = useSocket();
   const { user } = useAuth();
   let typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -242,15 +242,21 @@ export const DirectMessageView: React.FC = () => {
   }
 
   const friend = conversation.friend;
-  const isOnline = onlineUsers.includes(friend?._id) || friend?.isOnline;
+  const isOverride = presenceOverrides[friend?._id];
+  const isOnline = isOverride !== undefined ? isOverride : (onlineUsers.includes(friend?._id) || friend?.isOnline);
 
   return (
     <div className="flex-1 flex flex-col bg-background h-full min-w-0 relative">
       {/* Chat Header */}
       <div className="h-12 border-b border-divider flex items-center px-4 shrink-0 shadow-sm">
         <AtSign size={24} className="text-text-muted mr-2" />
-        <h3 className="font-bold text-white truncate mr-2">{friend?.username}</h3>
-        <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} title={isOnline ? 'Online' : 'Offline'} />
+        <div className="flex flex-col justify-center max-w-full min-w-0">
+          <h3 className="font-bold text-white truncate flex items-center">
+            {friend?.username}
+            <div className={`w-2 h-2 rounded-full ml-2 shrink-0 ${isOnline ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} title={isOnline ? 'Online' : 'Offline'} />
+          </h3>
+          <span className="text-xs text-text-muted leading-tight">{isOnline ? 'Online' : 'Offline'}</span>
+        </div>
       </div>
 
       {/* Messages Area */}

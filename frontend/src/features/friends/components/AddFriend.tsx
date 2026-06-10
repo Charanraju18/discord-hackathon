@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Search } from 'lucide-react';
+import { useSocket } from '../../socket/SocketContext';
 import { API_BASE_URL } from '../../../config';
 
 export const AddFriend: React.FC = () => {
@@ -10,6 +11,7 @@ export const AddFriend: React.FC = () => {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [successId, setSuccessId] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const { onlineUsers, presenceOverrides } = useSocket();
 
   useEffect(() => {
     if (!query.trim()) {
@@ -91,11 +93,16 @@ export const AddFriend: React.FC = () => {
         )}
         
         <div className="space-y-2">
-          {results.map((user) => (
+          {results.map((user) => {
+            const isOverride = presenceOverrides[user._id];
+            const isOnline = isOverride !== undefined ? isOverride : (onlineUsers.includes(user._id) || user.isOnline);
+
+            return (
             <div key={user._id} className="flex items-center justify-between p-3 hover:bg-white/5 rounded-lg border border-transparent hover:border-divider transition-colors group">
               <div className="flex items-center">
-                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold mr-4">
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold mr-4 relative">
                   {user.username.charAt(0).toUpperCase()}
+                  <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#313338] ${isOnline ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} />
                 </div>
                 <span className="font-semibold text-white">{user.username}</span>
               </div>
@@ -111,7 +118,8 @@ export const AddFriend: React.FC = () => {
                 {successId === user._id ? 'Friend Request Sent' : sendingId === user._id ? 'Sending...' : 'Send Friend Request'}
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

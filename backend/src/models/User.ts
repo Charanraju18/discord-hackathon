@@ -5,6 +5,7 @@ export interface IUser extends Document {
   email: string;
   password?: string;
   isOnline: boolean;
+  lastSeen?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +33,9 @@ const UserSchema = new Schema<IUser>(
     isOnline: {
       type: Boolean,
       default: false,
+    },
+    lastSeen: {
+      type: Date,
     },
   },
   {
