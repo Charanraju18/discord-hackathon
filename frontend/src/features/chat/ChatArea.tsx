@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Hash, PlusCircle, Send, Users } from 'lucide-react';
+import { Hash, PlusCircle, Send, Users, Edit2, Trash2, X } from 'lucide-react';
 import { useSocket } from '../socket/SocketContext';
 import { useAuth } from '../auth/AuthContext';
 import { MembersSidebar } from '../servers/MembersSidebar';
@@ -14,6 +14,8 @@ export const ChatArea: React.FC = () => {
   const [message, setMessage] = useState('');
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [showMembersMobile, setShowMembersMobile] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { socket } = useSocket();
   const { user } = useAuth();
@@ -87,17 +89,70 @@ export const ChatArea: React.FC = () => {
         }
       };
 
+      const handleMessageUpdated = (updatedMessage: any) => {
+        if (updatedMessage.channelId === channelId) {
+          setMessages((prev) => prev.map((m) => (m._id === updatedMessage._id ? updatedMessage : m)));
+        }
+      };
+
+      const handleMessageDeleted = (deletedMessage: any) => {
+        if (deletedMessage.channelId === channelId) {
+          setMessages((prev) => prev.filter((m) => m._id !== deletedMessage._id));
+        }
+      };
+
       socket.on('receive-message', handleReceiveMessage);
       socket.on('user-typing', handleUserTyping);
       socket.on('user-stop-typing', handleUserStopTyping);
+      socket.on('message-updated', handleMessageUpdated);
+      socket.on('message-deleted', handleMessageDeleted);
 
       return () => {
         socket.off('receive-message', handleReceiveMessage);
         socket.off('user-typing', handleUserTyping);
         socket.off('user-stop-typing', handleUserStopTyping);
+        socket.off('message-updated', handleMessageUpdated);
+        socket.off('message-deleted', handleMessageDeleted);
       };
     }
   }, [channelId, socket, user?.username]);
+
+  const handleEditSubmit = async (e: React.FormEvent, messageId: string) => {
+    e.preventDefault();
+    if (!editContent.trim()) return;
+
+    // Optimistic Update
+    setMessages((prev) => prev.map((m) => m._id === messageId ? { ...m, content: editContent.trim(), isEdited: true } : m));
+    setEditingMessageId(null);
+    setEditContent('');
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(`${API_BASE_URL}/api/messages/${messageId}`, 
+        { content: editContent.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (err) {
+      console.error('Failed to edit message', err);
+      // Fallback on error handled by next socket sync or refresh
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!window.confirm('Delete Message?\n\nThis action cannot be undone.')) return;
+
+    // Optimistic Update: completely remove it from the chat feed
+    setMessages((prev) => prev.filter((m) => m._id !== messageId));
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_BASE_URL}/api/messages/${messageId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      console.error('Failed to delete message', err);
+    }
+  };
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,7 +232,7 @@ export const ChatArea: React.FC = () => {
                       </div>
                     )}
                     
-                    <div className="flex flex-col flex-1 min-w-0">
+                    <div className="flex flex-col flex-1 min-w-0 relative">
                       {!isSameSenderAsPrev && (
                         <div className="flex items-baseline">
                           <span className="font-medium text-white mr-2 hover:underline cursor-pointer">{msg.senderId?.username}</span>
@@ -186,7 +241,52 @@ export const ChatArea: React.FC = () => {
                           </span>
                         </div>
                       )}
-                      <span className="text-text-normal break-words leading-relaxed">{msg.content}</span>
+                      
+                      {editingMessageId === msg._id ? (
+                        <form onSubmit={(e) => handleEditSubmit(e, msg._id)} className="mt-1 flex flex-col">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') setEditingMessageId(null);
+                            }}
+                            className="w-full bg-[#383a40] text-text-normal p-2 rounded border border-transparent focus:outline-none focus:border-[#00a8fc]"
+                          />
+                          <div className="text-xs mt-1">
+                            escape to <span className="text-blue-400 cursor-pointer hover:underline" onClick={() => setEditingMessageId(null)}>cancel</span> • enter to <span className="text-blue-400 cursor-pointer hover:underline" onClick={(e) => handleEditSubmit(e as any, msg._id)}>save</span>
+                          </div>
+                        </form>
+                      ) : (
+                        <span className={`text-text-normal break-words leading-relaxed ${msg.deleted ? 'text-text-muted italic' : ''}`}>
+                          {msg.content}
+                          {msg.isEdited && !msg.deleted && <span className="text-[10px] text-text-muted ml-1">(edited)</span>}
+                        </span>
+                      )}
+                      
+                      {/* Hover Actions Toolbar */}
+                      {user?._id === msg.senderId?._id && !msg.deleted && editingMessageId !== msg._id && (
+                        <div className="absolute right-0 -top-4 opacity-0 group-hover:opacity-100 bg-[#313338] border border-divider shadow-sm rounded flex items-center overflow-hidden transition-opacity">
+                          <button 
+                            className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors"
+                            onClick={() => {
+                              setEditingMessageId(msg._id);
+                              setEditContent(msg.content);
+                            }}
+                            title="Edit"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            className="p-1.5 text-red-500 hover:text-red-400 hover:bg-white/10 transition-colors"
+                            onClick={() => handleDeleteMessage(msg._id)}
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

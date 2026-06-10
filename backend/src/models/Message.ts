@@ -4,6 +4,10 @@ export interface IMessage extends Document {
   content: string;
   senderId: mongoose.Types.ObjectId;
   channelId: mongoose.Types.ObjectId;
+  isEdited: boolean;
+  editedAt?: Date;
+  deleted: boolean;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,6 +28,20 @@ const MessageSchema = new Schema<IMessage>(
       type: Schema.Types.ObjectId,
       ref: 'Channel',
       required: true,
+    },
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    editedAt: {
+      type: Date,
+    },
+    deleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
     },
   },
   {
