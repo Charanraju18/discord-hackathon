@@ -57,7 +57,7 @@ Over:
 Use feature-based architecture.
 
 Frontend:
-
+```
 src/
 ├── features/
 ├── components/
@@ -67,9 +67,9 @@ src/
 ├── services/
 ├── lib/
 ├── types/
-
+```
 Backend:
-
+```
 src/
 ├── controllers/
 ├── services/
@@ -79,7 +79,7 @@ src/
 ├── sockets/
 ├── config/
 ├── utils/
-
+```
 Avoid deeply nested folder structures.
 
 ---
