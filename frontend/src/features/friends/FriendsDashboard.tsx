@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Users } from 'lucide-react';
 import { AddFriend } from './components/AddFriend';
 import { FriendCard } from './components/FriendCard';
+import { useSocket } from '../socket/SocketContext';
 import { API_BASE_URL } from '../../config';
 
 interface FriendsDashboardProps {
@@ -16,6 +18,7 @@ export const FriendsDashboard: React.FC<FriendsDashboardProps> = ({ activeTab, o
   const [outgoing, setOutgoing] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { onlineUsers } = useSocket();
 
   const fetchFriendsAndRequests = async () => {
     try {
@@ -26,7 +29,11 @@ export const FriendsDashboard: React.FC<FriendsDashboardProps> = ({ activeTab, o
       ]);
 
       if (friendsRes.data.success) {
-        setFriends(friendsRes.data.data);
+        const mappedFriends = friendsRes.data.data.map((f: any) => ({
+          ...f,
+          status: onlineUsers.includes(f._id) ? 'online' : 'offline'
+        }));
+        setFriends(mappedFriends);
       }
       if (requestsRes.data.success) {
         setIncoming(requestsRes.data.data.incoming);
@@ -43,6 +50,14 @@ export const FriendsDashboard: React.FC<FriendsDashboardProps> = ({ activeTab, o
   useEffect(() => {
     fetchFriendsAndRequests();
   }, [activeTab]);
+
+  // Update online status in real-time
+  useEffect(() => {
+    setFriends(prev => prev.map(f => ({
+      ...f,
+      status: onlineUsers.includes(f._id) ? 'online' : 'offline'
+    })));
+  }, [onlineUsers]);
 
   const handleAccept = async (requestId: string) => {
     setActionLoading(requestId);
@@ -79,12 +94,33 @@ export const FriendsDashboard: React.FC<FriendsDashboardProps> = ({ activeTab, o
     setActionLoading(friendId);
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`${API_BASE_URL}/api/friends/${friendId}`, {
+      const res = await axios.delete(`${API_BASE_URL}/api/friends/${friendId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      fetchFriendsAndRequests();
+      if (res.data.success) {
+        setFriends(prev => prev.filter(f => f._id !== friendId));
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to remove friend', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const navigate = useNavigate();
+
+  const handleMessage = async (friendId: string) => {
+    setActionLoading(friendId);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`${API_BASE_URL}/api/dms/start`, { friendId }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) {
+        navigate(`/channels/@me/${res.data.data._id}`);
+      }
+    } catch (err) {
+      console.error('Failed to start DM', err);
     } finally {
       setActionLoading(null);
     }
@@ -97,38 +133,46 @@ export const FriendsDashboard: React.FC<FriendsDashboardProps> = ({ activeTab, o
       return <AddFriend />;
     }
 
-    if (activeTab === 'online' || activeTab === 'all') {
-      const displayFriends = activeTab === 'online' ? friends.filter(f => f.status === 'online') : friends;
-      
-      if (displayFriends.length === 0) {
+    switch (activeTab) {
+      case 'online':
+        const onlineFriends = friends.filter(f => f.status === 'online');
         return (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-64 h-48 mb-8 bg-white/5 rounded-lg flex items-center justify-center">
-              <Users size={64} className="text-text-muted opacity-50" />
-            </div>
-            <p className="text-text-muted">No one's around to play with Wumpus.</p>
+          <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
+            <h3 className="uppercase text-xs font-bold text-text-muted mb-4">Online — {onlineFriends.length}</h3>
+            {onlineFriends.length === 0 ? (
+              <div className="flex flex-col items-center justify-center mt-20 text-center">
+                <div className="w-64 h-64 bg-server-bg rounded-lg mb-8 flex items-center justify-center">
+                  <span className="text-text-muted">No one's around to play with Wumpus.</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-[1px]">
+                {onlineFriends.map(f => (
+                  <FriendCard key={f._id} user={f} type="friend" onMessage={handleMessage} onRemove={() => handleRemove(f._id)} actionLoading={actionLoading === f._id} />
+                ))}
+              </div>
+            )}
           </div>
         );
-      }
-
-      return (
-        <div className="p-6">
-          <h3 className="text-xs font-bold text-text-muted uppercase mb-4 tracking-wider">
-            {activeTab === 'online' ? 'Online' : 'All Friends'} — {displayFriends.length}
-          </h3>
-          <div className="flex flex-col">
-            {displayFriends.map(friend => (
-              <FriendCard 
-                key={friend._id} 
-                user={friend} 
-                type="friend" 
-                onRemove={() => handleRemove(friend._id)}
-                actionLoading={actionLoading === friend._id}
-              />
-            ))}
+      case 'all':
+        return (
+          <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
+            <h3 className="uppercase text-xs font-bold text-text-muted mb-4">All Friends — {friends.length}</h3>
+            {friends.length === 0 ? (
+              <div className="flex flex-col items-center justify-center mt-20 text-center">
+                <div className="w-64 h-64 bg-server-bg rounded-lg mb-8 flex items-center justify-center">
+                  <span className="text-text-muted">Wumpus is waiting on friends. You don't have to though!</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-[1px]">
+                {friends.map(f => (
+                  <FriendCard key={f._id} user={f} type="friend" onMessage={handleMessage} onRemove={() => handleRemove(f._id)} actionLoading={actionLoading === f._id} />
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      );
+        );
     }
 
     if (activeTab === 'pending') {

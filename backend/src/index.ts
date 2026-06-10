@@ -13,6 +13,7 @@ import inviteRoutes from './routes/invite.routes';
 import userRoutes from './routes/user.routes';
 import serverInvitationRoutes from './routes/serverInvitation.routes';
 import friendRoutes from './routes/friend.routes';
+import directMessageRoutes from './routes/directMessage.routes';
 import { Message } from './models/Message';
 
 dotenv.config();
@@ -44,6 +45,7 @@ app.use('/api/invites', inviteRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/server-invitations', serverInvitationRoutes);
 app.use('/api/friends', friendRoutes);
+app.use('/api/dms', directMessageRoutes);
 
 // Presence Registries
 const userSockets = new Map<string, Set<string>>(); // userId -> Set of socketIds
@@ -117,6 +119,19 @@ io.on('connection', (socket) => {
 
   socket.on('stop-typing', ({ channelId, username }) => {
     socket.to(channelId).emit('user-stop-typing', { channelId, username });
+  });
+
+  // --- DM Events ---
+  socket.on('dm:join-conversation', ({ conversationId }) => {
+    socket.join(`dm:${conversationId}`);
+  });
+
+  socket.on('dm:typing', ({ conversationId, username }) => {
+    socket.to(`dm:${conversationId}`).emit('dm:typing', { conversationId, username });
+  });
+
+  socket.on('dm:stop-typing', ({ conversationId, username }) => {
+    socket.to(`dm:${conversationId}`).emit('dm:stop-typing', { conversationId, username });
   });
 
   socket.on('disconnect', () => {

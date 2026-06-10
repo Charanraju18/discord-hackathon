@@ -8,6 +8,8 @@ import { API_BASE_URL } from '../config';
 import { SecondarySidebarLayout } from './SecondarySidebarLayout';
 import { FriendsSidebar } from '../features/friends/FriendsSidebar';
 import { FriendsDashboard } from '../features/friends/FriendsDashboard';
+import { DirectMessagesSidebar } from '../features/dms/DirectMessagesSidebar';
+import { DirectMessageView } from '../features/dms/DirectMessageView';
 
 const ServerLayout = () => (
   <>
@@ -30,11 +32,17 @@ const MeLayout = () => {
           setActiveTab={setActiveTab} 
           pendingCount={pendingCount} 
         />
+        <DirectMessagesSidebar />
       </SecondarySidebarLayout>
-      <FriendsDashboard 
-        activeTab={activeTab} 
-        onCountsUpdate={setPendingCount} 
-      />
+      <Routes>
+        <Route path="" element={
+          <FriendsDashboard 
+            activeTab={activeTab} 
+            onCountsUpdate={setPendingCount} 
+          />
+        } />
+        <Route path=":conversationId" element={<DirectMessageView />} />
+      </Routes>
     </>
   );
 };
@@ -64,7 +72,7 @@ export const AppLayout: React.FC = () => {
       <ServerSidebar servers={servers} onServerCreated={(s) => setServers([...servers, s])} />
 
       <Routes>
-        <Route path="@me" element={<MeLayout />} />
+        <Route path="@me/*" element={<MeLayout />} />
         
         <Route path=":serverId" element={<ServerLayout />}>
           <Route path="" element={<div className="flex-1 bg-background flex items-center justify-center text-text-muted">Select a channel</div>} />
