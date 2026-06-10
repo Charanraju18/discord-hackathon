@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
+  onlineUsers: string[];
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -13,15 +14,26 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) return;
 
-    const newSocket = io('http://localhost:5000');
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const newSocket = io('http://localhost:5000', {
+      auth: {
+        token
+      }
+    });
 
     newSocket.on('connect', () => {
       setIsConnected(true);
-      newSocket.emit('user-online', { userId: user._id });
+    });
+
+    newSocket.on('online-users', (users: string[]) => {
+      setOnlineUsers(users);
     });
 
     newSocket.on('disconnect', () => {
@@ -36,7 +48,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [user]);
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected }}>
+    <SocketContext.Provider value={{ socket, isConnected, onlineUsers }}>
       {children}
     </SocketContext.Provider>
   );

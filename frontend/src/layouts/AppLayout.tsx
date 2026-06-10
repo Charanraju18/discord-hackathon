@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Outlet } from 'react-router-dom';
 import axios from 'axios';
 import { ServerSidebar } from '../features/servers/ServerSidebar';
 import { ChannelSidebar } from '../features/channels/ChannelSidebar';
 import { ChatArea } from '../features/chat/ChatArea';
 import { useAuth } from '../features/auth/AuthContext';
+
+const ServerLayout = () => (
+  <>
+    <ChannelSidebar />
+    <Outlet />
+  </>
+);
 
 export const AppLayout: React.FC = () => {
   const { user } = useAuth();
@@ -29,7 +36,6 @@ export const AppLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-text-normal">
-      {/* Servers Sidebar (Leftmost) */}
       <ServerSidebar servers={servers} onServerCreated={(s) => setServers([...servers, s])} />
 
       <Routes>
@@ -42,18 +48,10 @@ export const AppLayout: React.FC = () => {
           </div>
         } />
         
-        <Route path=":serverId/*" element={
-          <>
-            {/* Channels Sidebar (Middle) */}
-            <ChannelSidebar />
-            
-            {/* Chat Area (Right) */}
-            <Routes>
-              <Route path="" element={<div className="flex-1 bg-background flex items-center justify-center text-text-muted">Select a channel</div>} />
-              <Route path=":channelId" element={<ChatArea />} />
-            </Routes>
-          </>
-        } />
+        <Route path=":serverId" element={<ServerLayout />}>
+          <Route path="" element={<div className="flex-1 bg-background flex items-center justify-center text-text-muted">Select a channel</div>} />
+          <Route path=":channelId" element={<ChatArea />} />
+        </Route>
       </Routes>
     </div>
   );

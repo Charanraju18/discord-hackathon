@@ -62,3 +62,27 @@ export const joinServer = async (req: Request, res: Response): Promise<void> => 
     res.status(500).json({ success: false, message: 'Server error joining server' });
   }
 };
+
+export const getServerMembers = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { serverId } = req.params;
+    const userId = (req as any).user.id;
+
+    const server = await Server.findById(serverId).populate('members', 'username email');
+    if (!server) {
+      res.status(404).json({ success: false, message: 'Server not found' });
+      return;
+    }
+
+    // Validate that the requester is a member of the server
+    const isMember = server.members.some((member: any) => member.id === userId || member._id.toString() === userId);
+    if (!isMember) {
+      res.status(403).json({ success: false, message: 'Not authorized to view members' });
+      return;
+    }
+
+    res.json({ success: true, data: { members: server.members, ownerId: server.ownerId } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error fetching server members' });
+  }
+};

@@ -3,6 +3,7 @@ import cors from 'cors';
 import http from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
 import { connectDB } from './config/db';
 import authRoutes from './routes/auth.routes';
 import serverRoutes from './routes/server.routes';
@@ -34,14 +35,49 @@ app.use('/api/servers', serverRoutes);
 app.use('/api/channels', channelRoutes);
 app.use('/api/messages', messageRoutes);
 
-// Socket.IO
+// Presence Registries
+const userSockets = new Map<string, Set<string>>(); // userId -> Set of socketIds
+const socketUser = new Map<string, string>(); // socketId -> userId
+
+const broadcastOnlineUsers = () => {
+  const onlineUsers = Array.from(userSockets.keys());
+  io.emit('online-users', onlineUsers);
+};
+
+// Socket.IO Middleware for Authentication
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    return next(new Error('Authentication error: No token provided'));
+  }
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as any;
+    (socket as any).userId = decoded.id;
+    next();
+  } catch (err) {
+    return next(new Error('Authentication error: Invalid token'));
+  }
+});
+
+// Socket.IO Events
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
+  const userId = (socket as any).userId;
+  console.log(`User connected: ${userId} on socket ${socket.id}`);
+
+  // Register Presence
+  if (!userSockets.has(userId)) {
+    userSockets.set(userId, new Set());
+  }
+  userSockets.get(userId)!.add(socket.id);
+  socketUser.set(socket.id, userId);
+
+  // Broadcast updated presence
+  broadcastOnlineUsers();
 
   // When a user joins a channel
   socket.on('join-channel', ({ channelId }) => {
     socket.join(channelId);
-    console.log(`User joined channel: ${channelId}`);
   });
 
   // When a user sends a message
@@ -49,17 +85,14 @@ io.on('connection', (socket) => {
     try {
       const { channelId, content, senderId, username } = data;
       
-      // Save message to DB
       const message = await Message.create({
         content,
         senderId,
         channelId,
       });
 
-      // We need to populate the sender for the frontend
       const populatedMessage = await Message.findById(message._id).populate('senderId', 'username email');
 
-      // Broadcast to channel
       io.to(channelId).emit('receive-message', populatedMessage);
     } catch (err) {
       console.error('Error saving message:', err);
@@ -75,14 +108,23 @@ io.on('connection', (socket) => {
     socket.to(channelId).emit('user-stop-typing', { channelId, username });
   });
 
-  // User online status (Basic MVP)
-  socket.on('user-online', ({ userId }) => {
-    socket.broadcast.emit('user-online', { userId });
-  });
-
   socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
-    // Would handle offline status here if mapping socket.id to userId
+    console.log(`User disconnected: socket ${socket.id}`);
+    
+    const uid = socketUser.get(socket.id);
+    if (uid) {
+      const sockets = userSockets.get(uid);
+      if (sockets) {
+        sockets.delete(socket.id);
+        if (sockets.size === 0) {
+          userSockets.delete(uid);
+        }
+      }
+      socketUser.delete(socket.id);
+      
+      // Broadcast updated presence
+      broadcastOnlineUsers();
+    }
   });
 });
 
