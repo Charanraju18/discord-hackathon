@@ -28,7 +28,7 @@ export const startConversation = async (req: Request, res: Response): Promise<vo
     }
 
     // Find existing conversation
-    let conversation = await DirectConversation.findOne({ participants: { $all: [userId, friendId] } }).populate('participants', 'username status avatar');
+    let conversation = await DirectConversation.findOne({ participants: { $all: [userId, friendId] } }).populate('participants', 'username status avatar isOnline avatar');
     
     if (!conversation) {
       // Create new conversation
@@ -36,7 +36,7 @@ export const startConversation = async (req: Request, res: Response): Promise<vo
         participants: [userId, friendId],
         readStates: new Map()
       });
-      conversation = await conversation.populate('participants', 'username status avatar');
+      conversation = await conversation.populate('participants', 'username status avatar isOnline avatar');
     }
 
     res.status(200).json({ success: true, data: conversation });
@@ -51,7 +51,7 @@ export const getConversations = async (req: Request, res: Response): Promise<voi
     const userId = (req as any).user.id;
 
     const conversations = await DirectConversation.find({ participants: userId })
-      .populate('participants', 'username email status avatar')
+      .populate('participants', 'username email status avatar isOnline avatar')
       .populate('lastMessageId')
       .sort({ updatedAt: -1 });
 
@@ -95,7 +95,7 @@ export const getMessages = async (req: Request, res: Response): Promise<void> =>
       conversationId,
       deleted: { $ne: true } 
     })
-      .populate('senderId', 'username email')
+      .populate('senderId', 'username email isOnline avatar')
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
@@ -139,7 +139,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<void> =>
     conversation.readStates.set(userId, new Date()); // Mark sender as read
     await conversation.save();
 
-    const populatedMessage = await DirectMessage.findById(message._id).populate('senderId', 'username email');
+    const populatedMessage = await DirectMessage.findById(message._id).populate('senderId', 'username email isOnline avatar');
 
     // Emit via socket
     const io = req.app.get('io');
@@ -201,7 +201,7 @@ export const editMessage = async (req: Request, res: Response): Promise<void> =>
     message.editedAt = new Date();
     await message.save();
 
-    const populatedMessage = await DirectMessage.findById(message._id).populate('senderId', 'username email');
+    const populatedMessage = await DirectMessage.findById(message._id).populate('senderId', 'username email isOnline avatar');
 
     const io = req.app.get('io');
     if (io) {

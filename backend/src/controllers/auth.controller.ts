@@ -40,6 +40,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           _id: user.id,
           username: user.username,
           email: user.email,
+          isOnline: user.isOnline,
           token: generateToken(user.id),
         },
       });
@@ -64,6 +65,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           _id: user.id,
           username: user.username,
           email: user.email,
+          isOnline: user.isOnline,
           token: generateToken(user.id),
         },
       });
@@ -90,6 +92,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
         _id: user.id,
         username: user.username,
         email: user.email,
+        isOnline: user.isOnline,
       },
     });
   } catch (error) {

@@ -37,7 +37,7 @@ export const DirectMessagesSidebar: React.FC = () => {
   }, [socket]);
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col flex-1 overflow-y-auto w-full custom-scrollbar">
       <div className="px-4 py-2 mt-2">
         <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2 flex justify-between items-center group">
           Direct Messages

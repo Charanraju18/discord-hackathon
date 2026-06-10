@@ -26,12 +26,14 @@ export const ChatArea: React.FC = () => {
   let typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }, 100);
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, typingUsers]);
+  }, [messages, typingUsers, pendingFiles]);
 
   useEffect(() => {
     const fetchMessagesAndChannel = async () => {

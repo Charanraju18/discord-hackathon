@@ -58,8 +58,8 @@ export const inviteUser = async (req: Request, res: Response): Promise<void> => 
     } as any);
 
     const populatedInvitation = await ServerInvitation.findById(invitation._id)
-      .populate('serverId', 'name')
-      .populate('senderId', 'username');
+      .populate('serverId', 'name isOnline avatar')
+      .populate('senderId', 'username isOnline avatar');
 
     // Emit real-time notification
     const io = req.app.get('io');
@@ -87,8 +87,8 @@ export const getInvitations = async (req: Request, res: Response): Promise<void>
       status: 'pending',
       $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }]
     })
-      .populate('serverId', 'name')
-      .populate('senderId', 'username')
+      .populate('serverId', 'name isOnline avatar')
+      .populate('senderId', 'username isOnline avatar')
       .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, data: invitations });

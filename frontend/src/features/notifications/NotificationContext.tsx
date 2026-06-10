@@ -73,8 +73,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!socket) return;
 
     const handleNotification = (notif: any) => {
-      // It can be a fully formed notification from the backend
-      setNotifications(prev => [notif, ...prev]);
+      // Ensure the notification has an id property so actions work
+      const newNotif = { ...notif };
+      if (!newNotif.id && newNotif.data && newNotif.data._id) {
+        newNotif.id = newNotif.data._id;
+      }
+      setNotifications(prev => [newNotif, ...prev]);
     };
 
     socket.on('notification-created', handleNotification);

@@ -68,7 +68,7 @@ export const getServerMembers = async (req: Request, res: Response): Promise<voi
     const { serverId } = req.params;
     const userId = (req as any).user.id;
 
-    const server = await Server.findById(serverId).populate('members', 'username email');
+    const server = await Server.findById(serverId).populate('members', 'username email isOnline avatar');
     if (!server) {
       res.status(404).json({ success: false, message: 'Server not found' });
       return;

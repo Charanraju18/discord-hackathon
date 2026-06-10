@@ -25,12 +25,14 @@ export const DirectMessageView: React.FC = () => {
   let typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }, 100);
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, typingUsers]);
+  }, [messages, typingUsers, pendingFiles]);
 
   useEffect(() => {
     const fetchMessagesAndConversation = async () => {
@@ -240,7 +242,7 @@ export const DirectMessageView: React.FC = () => {
   }
 
   const friend = conversation.friend;
-  const isOnline = onlineUsers.includes(friend?._id);
+  const isOnline = onlineUsers.includes(friend?._id) || friend?.isOnline;
 
   return (
     <div className="flex-1 flex flex-col bg-background h-full min-w-0 relative">

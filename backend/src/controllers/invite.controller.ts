@@ -84,8 +84,8 @@ export const getInvite = async (req: Request, res: Response): Promise<void> => {
     const { code } = req.params;
 
     const invite = await Invite.findOne({ code })
-      .populate('serverId', 'name members')
-      .populate('createdBy', 'username');
+      .populate('serverId', 'name members isOnline avatar')
+      .populate('createdBy', 'username isOnline avatar');
 
     if (!invite) {
       res.status(404).json({ success: false, message: 'Invite not found or invalid' });

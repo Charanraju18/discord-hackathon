@@ -16,14 +16,14 @@ export const FriendsSidebar: React.FC<FriendsSidebarProps> = ({ activeTab, setAc
   ];
 
   return (
-    <div className="flex flex-col h-full w-full bg-channel-bg">
+    <div className="flex flex-col w-full bg-channel-bg">
       {/* Header */}
       <div className="h-12 border-b border-divider flex items-center justify-between px-4 font-bold text-white shadow-sm shrink-0">
         <span className="truncate">Friends</span>
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 py-3 px-2 space-y-[2px]">
+      <div className="py-3 px-2 space-y-[2px]">
         {tabs.map((tab) => (
           <button
             key={tab.id}

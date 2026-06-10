@@ -48,7 +48,7 @@ export const sendRequest = async (req: Request, res: Response): Promise<void> =>
     }
 
     const request = await FriendRequest.create({ senderId, receiverId });
-    const populatedRequest = await FriendRequest.findById(request._id).populate('senderId', 'username email').populate('receiverId', 'username email');
+    const populatedRequest = await FriendRequest.findById(request._id).populate('senderId', 'username email isOnline avatar').populate('receiverId', 'username email isOnline avatar');
 
     // Create Notification for receiver
     const notification = await Notification.create({
@@ -81,8 +81,8 @@ export const getRequests = async (req: Request, res: Response): Promise<void> =>
   try {
     const userId = (req as any).user.id;
 
-    const incoming = await FriendRequest.find({ receiverId: userId }).populate('senderId', 'username email');
-    const outgoing = await FriendRequest.find({ senderId: userId }).populate('receiverId', 'username email');
+    const incoming = await FriendRequest.find({ receiverId: userId }).populate('senderId', 'username email isOnline avatar');
+    const outgoing = await FriendRequest.find({ senderId: userId }).populate('receiverId', 'username email isOnline avatar');
 
     res.json({
       success: true,
@@ -185,7 +185,7 @@ export const getFriends = async (req: Request, res: Response): Promise<void> => 
 
     const friendships = await Friendship.find({
       $or: [{ userOneId: userId }, { userTwoId: userId }]
-    }).populate('userOneId', 'username email').populate('userTwoId', 'username email');
+    }).populate('userOneId', 'username email isOnline avatar').populate('userTwoId', 'username email isOnline avatar');
 
     const friends = friendships.map(f => {
       const friend: any = f.userOneId._id.toString() === userId ? f.userTwoId : f.userOneId;
@@ -193,7 +193,9 @@ export const getFriends = async (req: Request, res: Response): Promise<void> => 
         _id: friend._id,
         username: friend.username,
         email: friend.email,
-        status: 'offline', // Future presence placeholder
+        status: friend.isOnline ? 'online' : 'offline',
+        isOnline: friend.isOnline,
+        avatar: friend.avatar,
         friendshipId: f._id
       };
     });

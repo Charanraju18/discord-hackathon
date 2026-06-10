@@ -107,7 +107,7 @@ io.on('connection', (socket) => {
         channelId,
       });
 
-      const populatedMessage = await Message.findById(message._id).populate('senderId', 'username email');
+      const populatedMessage = await Message.findById(message._id).populate('senderId', 'username email isOnline avatar');
 
       io.to(channelId).emit('receive-message', populatedMessage);
     } catch (err) {

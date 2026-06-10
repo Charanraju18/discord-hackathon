@@ -13,7 +13,7 @@ export const getMessages = async (req: Request, res: Response): Promise<void> =>
     }
 
     const messages = await Message.find({ channelId, deleted: { $ne: true } })
-      .populate('senderId', 'username email')
+      .populate('senderId', 'username email isOnline avatar')
       .sort({ createdAt: 1 })
       .lean();
 
@@ -55,7 +55,7 @@ export const editMessage = async (req: Request, res: Response): Promise<void> =>
     message.editedAt = new Date();
     await message.save();
 
-    const populatedMessage = await Message.findById(message._id).populate('senderId', 'username email');
+    const populatedMessage = await Message.findById(message._id).populate('senderId', 'username email isOnline avatar');
 
     const io = req.app.get('io');
     if (io) {
@@ -96,7 +96,7 @@ export const deleteMessage = async (req: Request, res: Response): Promise<void> 
     await message.save();
 
     const populatedMessage = await Message.findById(message._id)
-      .populate('senderId', 'username email')
+      .populate('senderId', 'username email isOnline avatar')
       .lean();
 
     // Scrub content for the socket payload

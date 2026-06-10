@@ -44,7 +44,7 @@ export const searchUsers = async (req: Request, res: Response): Promise<void> =>
       _id: { $nin: excludeIds },
       username: { $regex: safeQuery, $options: 'i' }
     })
-    .select('_id username')
+    .select('_id username isOnline avatar')
     .skip(skip)
     .limit(limitNum)
     .lean();
