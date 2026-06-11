@@ -5,9 +5,11 @@ import { useSocket } from '../socket/SocketContext';
 import { API_BASE_URL } from '../../config';
 
 interface Member {
-  _id: string;
+  id: string;
   username: string;
   email: string;
+  isOnline: boolean;
+  role: string;
 }
 
 interface MembersSidebarProps {
@@ -28,46 +30,39 @@ export const MembersSidebar: React.FC<MembersSidebarProps> = ({ serverId, isOpen
         const res = await axios.get(`${API_BASE_URL}/api/servers/${serverId}/members`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (res.data.success) {
-          // Fallback array support in case backend hasn't restarted yet
-          const data = res.data.data;
-          if (Array.isArray(data)) {
-            setMembers(data);
-          } else {
-            setMembers(data.members);
-            setOwnerId(data.ownerId);
-          }
-        }
+        // FastAPI returns array directly: [{id, username, email, isOnline, role}, ...]
+        const data = Array.isArray(res.data) ? res.data : [];
+        setMembers(data);
+        const owner = data.find((m: Member) => m.role === 'owner');
+        if (owner) setOwnerId(owner.id);
       } catch (err) {
         console.error('Failed to fetch members', err);
       }
     };
-    if (serverId) {
-      fetchMembers();
-    }
+    if (serverId) fetchMembers();
   }, [serverId]);
 
-  const onlineMembers = members.filter((m) => onlineUsers.includes(m._id));
-  const offlineMembers = members.filter((m) => !onlineUsers.includes(m._id));
+  const onlineMembers = members.filter((m) => onlineUsers.includes(m.id) || m.isOnline);
+  const offlineMembers = members.filter((m) => !onlineUsers.includes(m.id) && !m.isOnline);
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-channel-bg lg:bg-[#2b2d31] pt-4 px-2 w-60 shrink-0 custom-scrollbar overflow-y-auto border-l border-divider lg:border-none">
+    <div className="flex flex-col h-full bg-channel-bg lg:bg-channel-bg pt-4 px-2 w-60 shrink-0 custom-scrollbar overflow-y-auto border-l border-divider lg:border-none">
       {onlineMembers.length > 0 && (
         <div className="mb-6">
           <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider px-2 mb-1">
             Online — {onlineMembers.length}
           </h3>
           {onlineMembers.map((m) => (
-            <div key={m._id} className="flex items-center px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer group">
+            <div key={m.id} className="flex items-center px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer group">
               <div className="relative mr-3">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold">
                   {m.username.charAt(0).toUpperCase()}
                 </div>
-                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#23a559] rounded-full border-[2.5px] border-[#2b2d31] group-hover:border-[#33353b] transition-colors"></div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#23a559] rounded-full border-[2.5px] border-channel-bg group-hover:border-[#33353b] transition-colors"></div>
               </div>
               <div className="flex items-center min-w-0">
                 <span className="text-text-normal font-medium truncate opacity-90 group-hover:opacity-100">{m.username}</span>
-                {ownerId === m._id && <Crown size={14} className="text-[#faa61a] ml-1.5 shrink-0" />}
+                {ownerId === m.id && <Crown size={14} className="text-[#faa61a] ml-1.5 shrink-0" />}
               </div>
             </div>
           ))}
@@ -80,19 +75,19 @@ export const MembersSidebar: React.FC<MembersSidebarProps> = ({ serverId, isOpen
             Offline — {offlineMembers.length}
           </h3>
           {offlineMembers.map((m) => (
-            <div key={m._id} className="flex items-center px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer group opacity-50 hover:opacity-100 transition-opacity">
+            <div key={m.id} className="flex items-center px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer group opacity-50 hover:opacity-100 transition-opacity">
               <div className="relative mr-3">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold">
                   {m.username.charAt(0).toUpperCase()}
                 </div>
                 {/* Offline indicator (transparent hollow circle) */}
-                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-transparent rounded-full border-[2.5px] border-[#2b2d31] group-hover:border-[#33353b] transition-colors">
-                  <div className="w-full h-full rounded-full border-[2px] border-[#80848e]"></div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-transparent rounded-full border-[2.5px] border-channel-bg group-hover:border-[#33353b] transition-colors">
+                  <div className="w-full h-full rounded-full border-2 border-[#80848e]"></div>
                 </div>
               </div>
               <div className="flex items-center min-w-0">
                 <span className="text-text-normal font-medium truncate">{m.username}</span>
-                {ownerId === m._id && <Crown size={14} className="text-[#faa61a] ml-1.5 shrink-0" />}
+                {ownerId === m.id && <Crown size={14} className="text-[#faa61a] ml-1.5 shrink-0" />}
               </div>
             </div>
           ))}
@@ -112,7 +107,7 @@ export const MembersSidebar: React.FC<MembersSidebarProps> = ({ serverId, isOpen
       {isOpenMobile && (
         <div className="lg:hidden fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/50" onClick={onCloseMobile}></div>
-          <div className="relative w-60 h-full bg-[#2b2d31] shadow-xl animate-in slide-in-from-right">
+          <div className="relative w-60 h-full bg-channel-bg shadow-xl animate-in slide-in-from-right">
             <SidebarContent />
           </div>
         </div>

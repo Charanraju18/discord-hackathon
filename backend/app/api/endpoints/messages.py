@@ -12,6 +12,28 @@ from app.sockets import sio
 
 router = APIRouter()
 
+def _user_dict(u) -> dict:
+    return {"id": str(u.id), "username": u.username, "email": u.email, "isOnline": u.isOnline}
+
+def _attachment_dict(a) -> dict:
+    return {"url": a.url, "publicId": a.publicId, "fileName": a.fileName, "fileSize": a.fileSize, "mimeType": a.mimeType, "resourceType": a.resourceType, "uploadedAt": str(a.uploadedAt) if a.uploadedAt else None}
+
+def _msg_dict(m, sender) -> dict:
+    return {
+        "id": str(m.id),
+        "channelId": str(m.channelId),
+        "serverId": str(m.serverId) if hasattr(m, 'serverId') and m.serverId else None,
+        "sender": _user_dict(sender) if sender else None,
+        "content": m.content,
+        "isEdited": m.isEdited,
+        "editedAt": str(m.editedAt) if m.editedAt else None,
+        "deleted": m.deleted,
+        "deletedAt": str(m.deletedAt) if m.deletedAt else None,
+        "attachments": [_attachment_dict(a) for a in m.attachments],
+        "createdAt": str(m.createdAt),
+        "updatedAt": str(m.updatedAt)
+    }
+
 @router.get("/{channel_id}")
 async def get_messages(
     channel_id: str,
@@ -26,21 +48,7 @@ async def get_messages(
     results = []
     for m in messages:
         sender = await User.get(m.senderId)
-        if sender:
-            results.append({
-                "id": str(m.id),
-                "channelId": str(m.channelId),
-                "serverId": str(m.serverId),
-                "sender": sender.model_dump(),
-                "content": m.content,
-                "isEdited": m.isEdited,
-                "editedAt": str(m.editedAt) if m.editedAt else None,
-                "deleted": m.deleted,
-                "deletedAt": str(m.deletedAt) if m.deletedAt else None,
-                "attachments": [a.model_dump() for a in m.attachments],
-                "createdAt": str(m.createdAt),
-                "updatedAt": str(m.updatedAt)
-            })
+        results.append(_msg_dict(m, sender))
     return results
 
 @router.put("/{message_id}")
@@ -66,21 +74,8 @@ async def edit_message(
     await msg.save()
     
     sender = await User.get(current_user.id)
-    payload = {
-        "id": str(msg.id),
-        "channelId": str(msg.channelId),
-        "serverId": str(msg.serverId),
-        "sender": sender.model_dump() if sender else None,
-        "content": msg.content,
-        "isEdited": msg.isEdited,
-        "editedAt": str(msg.editedAt),
-        "deleted": msg.deleted,
-        "attachments": [a.model_dump() for a in msg.attachments],
-        "createdAt": str(msg.createdAt),
-        "updatedAt": str(msg.updatedAt)
-    }
+    payload = _msg_dict(msg, sender)
     await sio.emit("message-updated", payload, room=str(msg.channelId))
-    
     return payload
 
 @router.delete("/{message_id}")
@@ -103,20 +98,6 @@ async def delete_message(
     await msg.save()
     
     sender = await User.get(current_user.id)
-    payload = {
-        "id": str(msg.id),
-        "channelId": str(msg.channelId),
-        "serverId": str(msg.serverId),
-        "sender": sender.model_dump() if sender else None,
-        "content": "Message deleted",
-        "isEdited": msg.isEdited,
-        "editedAt": str(msg.editedAt) if msg.editedAt else None,
-        "deleted": msg.deleted,
-        "deletedAt": str(msg.deletedAt),
-        "attachments": [a.model_dump() for a in msg.attachments],
-        "createdAt": str(msg.createdAt),
-        "updatedAt": str(msg.updatedAt)
-    }
+    payload = _msg_dict(msg, sender)
     await sio.emit("message-deleted", payload, room=str(msg.channelId))
-    
     return payload

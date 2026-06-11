@@ -5,6 +5,8 @@ import { AtSign, PlusCircle, Send, Edit2, Trash2, File, X, Loader2 } from 'lucid
 import { useSocket } from '../socket/SocketContext';
 import { useAuth } from '../auth/AuthContext';
 import { AttachmentRenderer } from '../../components/messages/AttachmentRenderer';
+import { ServerInviteCard, extractInviteCode } from '../../components/messages/ServerInviteCard';
+import { DMProfilePanel } from './DMProfilePanel';
 import { API_BASE_URL } from '../../config';
 
 export const DirectMessageView: React.FC = () => {
@@ -36,19 +38,15 @@ export const DirectMessageView: React.FC = () => {
       setLoading(true);
       try {
         const token = localStorage.getItem('token');
+        const headers = { Authorization: `Bearer ${token}` };
 
-        // GET /api/dms returns array directly; each conv has `id` (not `_id`) and `friend`
-        const convRes = await axios.get(`${API_BASE_URL}/api/dms`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const convList = Array.isArray(convRes.data) ? convRes.data : [];
-        const currentConv = convList.find((c: any) => c.id === conversationId);
-        if (currentConv) setConversation(currentConv);
+        // Fetch conversation and messages in parallel
+        const [convRes, msgsRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/dms/${conversationId}`, { headers }),
+          axios.get(`${API_BASE_URL}/api/dms/${conversationId}/messages`, { headers }),
+        ]);
 
-        // GET /api/dms/:id/messages returns array directly; each msg has `id`, `sender: {...}`
-        const msgsRes = await axios.get(`${API_BASE_URL}/api/dms/${conversationId}/messages`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        if (convRes.data?.id) setConversation(convRes.data);
         setMessages(Array.isArray(msgsRes.data) ? msgsRes.data : []);
       } catch (err) {
         console.error('Failed to fetch DM data', err);
@@ -64,7 +62,18 @@ export const DirectMessageView: React.FC = () => {
 
       const handleReceiveMessage = (msg: any) => {
         if (msg.conversationId === conversationId) {
-          setMessages(prev => [...prev, msg]);
+          setMessages(prev => {
+            // Replace matching optimistic message or append
+            const tempIdx = prev.findIndex(
+              m => m._optimistic && m.sender?.id === msg.sender?.id && m.content === msg.content
+            );
+            if (tempIdx !== -1) {
+              const next = [...prev];
+              next[tempIdx] = msg;
+              return next;
+            }
+            return [...prev, msg];
+          });
         }
       };
       const handleUserTyping = ({ conversationId: cid, username }: any) => {
@@ -155,8 +164,25 @@ export const DirectMessageView: React.FC = () => {
 
     const currentMessage = message;
     setMessage('');
+    setPendingFiles([]);
     socket?.emit('dm:stop-typing', { conversationId, username: user.username });
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    // Optimistic update — message appears instantly
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      conversationId,
+      sender: { id: user.id, username: user.username, email: user.email, isOnline: true },
+      content: currentMessage,
+      attachments: uploadedAttachments,
+      isEdited: false,
+      deleted: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      _optimistic: true,
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
 
     try {
       const token = localStorage.getItem('token');
@@ -164,9 +190,12 @@ export const DirectMessageView: React.FC = () => {
         { content: currentMessage, attachments: uploadedAttachments },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-    } catch (err) { console.error('Failed to send message', err); }
+    } catch (err) {
+      // Remove optimistic message on failure
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      console.error('Failed to send message', err);
+    }
 
-    setPendingFiles([]);
     setIsUploading(false);
   };
 
@@ -189,7 +218,8 @@ export const DirectMessageView: React.FC = () => {
   const isOnline = isOverride !== undefined ? isOverride : (onlineUsers.includes(friend?.id) || friend?.isOnline);
 
   return (
-    <div className="flex-1 flex flex-col bg-background h-full min-w-0 relative">
+    <div className="flex-1 flex h-full min-w-0">
+    <div className="flex-1 flex flex-col bg-background h-full min-w-0 relative overflow-hidden">
       {/* Header */}
       <div className="h-12 border-b border-divider flex items-center px-4 shrink-0 shadow-sm">
         <AtSign size={24} className="text-text-muted mr-2" />
@@ -259,12 +289,14 @@ export const DirectMessageView: React.FC = () => {
                       </form>
                     ) : (
                       <div className="flex flex-col">
-                        {msg.content && (
-                          <span className={`text-text-normal break-words leading-relaxed ${msg.deleted ? 'text-text-muted italic' : ''}`}>
+                        {msg.content && !msg.deleted && extractInviteCode(msg.content) ? (
+                          <ServerInviteCard inviteCode={extractInviteCode(msg.content)!} />
+                        ) : msg.content ? (
+                          <span className={`text-text-normal wrap-break-word leading-relaxed ${msg.deleted ? 'text-text-muted italic' : ''}`}>
                             {msg.content}
                             {msg.isEdited && !msg.deleted && <span className="text-[10px] text-text-muted ml-1">(edited)</span>}
                           </span>
-                        )}
+                        ) : null}
                         {!msg.deleted && msg.attachments?.length > 0 && (
                           <AttachmentRenderer attachments={msg.attachments} />
                         )}
@@ -272,7 +304,7 @@ export const DirectMessageView: React.FC = () => {
                     )}
 
                     {isOwn && !msg.deleted && editingMessageId !== msg.id && (
-                      <div className="absolute right-0 -top-4 opacity-0 group-hover:opacity-100 bg-[#313338] border border-divider shadow-sm rounded flex items-center overflow-hidden transition-opacity">
+                      <div className="absolute right-0 -top-4 opacity-0 group-hover:opacity-100 bg-background border border-divider shadow-sm rounded flex items-center overflow-hidden transition-opacity">
                         <button
                           className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors"
                           onClick={() => { setEditingMessageId(msg.id); setEditContent(msg.content); }}
@@ -312,11 +344,11 @@ export const DirectMessageView: React.FC = () => {
       {/* Input */}
       <div className="px-4 pb-6 pt-2 shrink-0 relative flex flex-col">
         {pendingFiles.length > 0 && (
-          <div className="bg-[#2b2d31] rounded-t-lg p-4 flex gap-4 overflow-x-auto border-b border-divider">
+          <div className="bg-channel-bg rounded-t-lg p-4 flex gap-4 overflow-x-auto border-b border-divider">
             {pendingFiles.map((file, idx) => {
               const isImage = file.type.startsWith('image/');
               return (
-                <div key={idx} className="relative w-40 h-40 bg-[#1e1f22] rounded flex flex-col items-center justify-center p-2 group shrink-0">
+                <div key={idx} className="relative w-40 h-40 bg-server-bg rounded flex flex-col items-center justify-center p-2 group shrink-0">
                   <button onClick={() => setPendingFiles(prev => prev.filter((_, i) => i !== idx))} className="absolute -top-2 -right-2 bg-[#f23f42] text-white rounded-full p-1 shadow hover:bg-red-600 z-10">
                     <X size={14} />
                   </button>
@@ -334,8 +366,26 @@ export const DirectMessageView: React.FC = () => {
           </div>
         )}
         <form onSubmit={handleSendMessage} className={`bg-channel-bg flex items-center px-4 py-2 ${pendingFiles.length > 0 ? 'rounded-b-lg' : 'rounded-lg'}`}>
-          <input type="file" multiple className="hidden" ref={fileInputRef} onChange={(e) => e.target.files && setPendingFiles(Array.from(e.target.files))} />
-          <button type="button" className="text-interactive-normal hover:text-interactive-hover mr-4" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+          <input
+            type="file"
+            multiple
+            className="hidden"
+            ref={fileInputRef}
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                setPendingFiles(Array.from(e.target.files));
+              }
+              // Reset so same file can be re-selected; don't clear pendingFiles on cancel
+              e.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            tabIndex={-1}
+            className="text-interactive-normal hover:text-interactive-hover mr-4 shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
             <PlusCircle size={24} />
           </button>
           <input
@@ -345,9 +395,16 @@ export const DirectMessageView: React.FC = () => {
             disabled={isUploading}
             placeholder={friend ? `Message @${friend.username}` : 'Message'}
             className="flex-1 bg-transparent text-text-normal focus:outline-none py-1.5 disabled:opacity-50"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage(e as any);
+              }
+            }}
           />
           <button
             type="submit"
+            tabIndex={-1}
             disabled={isUploading || (!message.trim() && pendingFiles.length === 0)}
             className={`${message.trim() || pendingFiles.length > 0 ? 'text-primary' : 'text-interactive-normal'} ml-2 transition-colors disabled:opacity-50 flex items-center`}
           >
@@ -355,6 +412,8 @@ export const DirectMessageView: React.FC = () => {
           </button>
         </form>
       </div>
+    </div>
+    {friend && <DMProfilePanel friend={friend} />}
     </div>
   );
 };

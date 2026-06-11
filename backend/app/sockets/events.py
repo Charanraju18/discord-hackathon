@@ -91,18 +91,18 @@ async def handle_new_message(sid, data):
         await new_msg.insert()
         
         sender = await User.get(ObjectId(user_id))
-        
+
         payload = {
             "id": str(new_msg.id),
             "channelId": str(new_msg.channelId),
             "serverId": str(new_msg.serverId),
-            "sender": sender.model_dump() if sender else None,
+            "sender": {"id": str(sender.id), "username": sender.username, "email": sender.email, "isOnline": sender.isOnline} if sender else None,
             "content": new_msg.content,
             "isEdited": new_msg.isEdited,
             "editedAt": str(new_msg.editedAt) if new_msg.editedAt else None,
             "deleted": new_msg.deleted,
             "deletedAt": str(new_msg.deletedAt) if new_msg.deletedAt else None,
-            "attachments": [a.model_dump() for a in new_msg.attachments],
+            "attachments": [{"url": a.url, "publicId": a.publicId, "fileName": a.fileName, "fileSize": a.fileSize, "mimeType": a.mimeType, "resourceType": a.resourceType, "uploadedAt": str(a.uploadedAt) if a.uploadedAt else None} for a in new_msg.attachments],
             "createdAt": str(new_msg.createdAt),
             "updatedAt": str(new_msg.updatedAt)
         }

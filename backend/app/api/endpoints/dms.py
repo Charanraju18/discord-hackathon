@@ -20,7 +20,7 @@ def _friend_dict(user) -> dict:
         "username": user.username,
         "email": user.email,
         "isOnline": user.isOnline,
-        "lastSeen": user.lastSeen
+        "lastSeen": str(user.lastSeen) if user.lastSeen else None
     }
 
 def _conv_response(conv, participants: list, current_user_id) -> dict:
@@ -66,6 +66,18 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
         participants = [p for pid in conv.participants if (p := await User.get(pid))]
         results.append(_conv_response(conv, participants, current_user.id))
     return results
+
+@router.get("/{conversation_id}")
+async def get_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    conv_id = ObjectId(conversation_id)
+    conv = await DirectConversation.get(conv_id)
+    if not conv or current_user.id not in conv.participants:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    participants = [p for pid in conv.participants if (p := await User.get(pid))]
+    return _conv_response(conv, participants, current_user.id)
 
 @router.get("/{conversation_id}/messages")
 async def get_messages(
@@ -131,7 +143,7 @@ async def send_message(
         "editedAt": str(new_msg.editedAt) if new_msg.editedAt else None,
         "deleted": new_msg.deleted,
         "deletedAt": str(new_msg.deletedAt) if new_msg.deletedAt else None,
-        "attachments": [a.model_dump() for a in new_msg.attachments],
+        "attachments": [{"url": a.url, "publicId": a.publicId, "fileName": a.fileName, "fileSize": a.fileSize, "mimeType": a.mimeType, "resourceType": a.resourceType, "uploadedAt": str(a.uploadedAt) if a.uploadedAt else None} for a in new_msg.attachments],
         "createdAt": str(new_msg.createdAt),
         "updatedAt": str(new_msg.updatedAt)
     }

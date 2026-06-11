@@ -41,24 +41,19 @@ export const ChatArea: React.FC = () => {
       try {
         const token = localStorage.getItem('token');
         
-        // Fetch messages
+        // Fetch messages — FastAPI returns array directly
         const messagesRes = await axios.get(`${API_BASE_URL}/api/messages/${channelId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (messagesRes.data.success) {
-          setMessages(messagesRes.data.data);
-        }
+        setMessages(Array.isArray(messagesRes.data) ? messagesRes.data : []);
 
-        // Fetch channel name by fetching channels for this server
+        // Fetch channel name — FastAPI returns array directly; each channel has `id`
         const channelsRes = await axios.get(`${API_BASE_URL}/api/channels/${serverId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (channelsRes.data.success) {
-          const currentChannel = channelsRes.data.data.find((c: any) => c._id === channelId);
-          if (currentChannel) {
-            setChannel(currentChannel);
-          }
-        }
+        const channelList = Array.isArray(channelsRes.data) ? channelsRes.data : [];
+        const currentChannel = channelList.find((c: any) => c.id === channelId);
+        if (currentChannel) setChannel(currentChannel);
       } catch (err) {
         console.error('Failed to fetch chat data', err);
       }
@@ -67,11 +62,22 @@ export const ChatArea: React.FC = () => {
     fetchMessagesAndChannel();
 
     if (socket && channelId) {
-      socket.emit('join-channel', { channelId });
+      socket.emit('join-channel', channelId);
 
       const handleReceiveMessage = (newMessage: any) => {
         if (newMessage.channelId === channelId) {
-          setMessages((prev) => [...prev, newMessage]);
+          setMessages(prev => {
+            // Replace matching optimistic message (same sender + content + recent) or append
+            const tempIdx = prev.findIndex(
+              m => m._optimistic && m.sender?.id === newMessage.sender?.id && m.content === newMessage.content
+            );
+            if (tempIdx !== -1) {
+              const next = [...prev];
+              next[tempIdx] = newMessage;
+              return next;
+            }
+            return [...prev, newMessage];
+          });
         }
       };
 
@@ -97,24 +103,25 @@ export const ChatArea: React.FC = () => {
 
       const handleMessageUpdated = (updatedMessage: any) => {
         if (updatedMessage.channelId === channelId) {
-          setMessages((prev) => prev.map((m) => (m._id === updatedMessage._id ? updatedMessage : m)));
+          setMessages((prev) => prev.map((m) => (m.id === updatedMessage.id ? updatedMessage : m)));
         }
       };
 
       const handleMessageDeleted = (deletedMessage: any) => {
         if (deletedMessage.channelId === channelId) {
-          setMessages((prev) => prev.filter((m) => m._id !== deletedMessage._id));
+          setMessages((prev) => prev.filter((m) => m.id !== deletedMessage.id));
         }
       };
 
-      socket.on('receive-message', handleReceiveMessage);
+      // Backend emits 'new-message' for channel messages
+      socket.on('new-message', handleReceiveMessage);
       socket.on('user-typing', handleUserTyping);
       socket.on('user-stop-typing', handleUserStopTyping);
       socket.on('message-updated', handleMessageUpdated);
       socket.on('message-deleted', handleMessageDeleted);
 
       return () => {
-        socket.off('receive-message', handleReceiveMessage);
+        socket.off('new-message', handleReceiveMessage);
         socket.off('user-typing', handleUserTyping);
         socket.off('user-stop-typing', handleUserStopTyping);
         socket.off('message-updated', handleMessageUpdated);
@@ -148,7 +155,7 @@ export const ChatArea: React.FC = () => {
     if (!window.confirm('Delete Message?\n\nThis action cannot be undone.')) return;
 
     // Optimistic Update: completely remove it from the chat feed
-    setMessages((prev) => prev.filter((m) => m._id !== messageId));
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
 
     try {
       const token = localStorage.getItem('token');
@@ -173,16 +180,14 @@ export const ChatArea: React.FC = () => {
         pendingFiles.forEach(file => formData.append('attachments', file));
         
         const token = localStorage.getItem('token');
-        const res = await axios.post(`${API_BASE_URL}/api/uploads`, formData, {
-          headers: { 
+        const res = await axios.post(`${API_BASE_URL}/api/upload`, formData, {
+          headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data'
           }
         });
-        
-        if (res.data.success) {
-          uploadedAttachments = res.data.data;
-        }
+        // FastAPI returns array directly
+        uploadedAttachments = Array.isArray(res.data) ? res.data : [];
       } catch (err: any) {
         console.error('Failed to upload files', err);
         alert(err.response?.data?.message || 'Failed to upload files. Please try again.');
@@ -191,20 +196,34 @@ export const ChatArea: React.FC = () => {
       }
     }
 
-    socket.emit('send-message', {
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
       channelId,
+      serverId,
+      sender: { id: user.id, username: user.username, email: user.email, isOnline: true },
       content: message,
       attachments: uploadedAttachments,
-      senderId: user._id,
-      username: user.username,
-    });
-    
-    socket.emit('stop-typing', { channelId, username: user.username });
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
+      isEdited: false,
+      deleted: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      _optimistic: true,
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
     setMessage('');
     setPendingFiles([]);
     setIsUploading(false);
+
+    socket.emit('new-message', {
+      channelId,
+      serverId,
+      content: message,
+      attachments: uploadedAttachments,
+    });
+
+    socket.emit('stop-typing', { channelId, username: user.username });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -263,44 +282,44 @@ export const ChatArea: React.FC = () => {
 
           <div className="flex flex-col space-y-4">
             {messages.map((msg, idx) => {
-              const isSameSenderAsPrev = idx > 0 && messages[idx - 1].senderId?._id === msg.senderId?._id;
-              
+              // FastAPI returns msg.sender (not msg.senderId)
+              const prevSenderId = idx > 0 ? messages[idx - 1].sender?.id : null;
+              const isSameSenderAsPrev = prevSenderId === msg.sender?.id;
+
               return (
-                <div key={msg._id} className={`flex items-start ${isSameSenderAsPrev ? 'mt-1' : 'mt-4'} hover:bg-white/5 -mx-4 px-4 py-0.5 group`}>
+                <div key={msg.id} className={`flex items-start ${isSameSenderAsPrev ? 'mt-1' : 'mt-4'} hover:bg-white/5 -mx-4 px-4 py-0.5 group`}>
                   {!isSameSenderAsPrev ? (
                     <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold mr-4 shrink-0 mt-0.5">
-                      {msg.senderId?.username?.charAt(0).toUpperCase()}
+                      {msg.sender?.username?.charAt(0).toUpperCase()}
                     </div>
                   ) : (
                     <div className="w-10 mr-4 shrink-0 text-xs text-text-muted opacity-0 group-hover:opacity-100 text-center leading-5">
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   )}
-                  
+
                   <div className="flex flex-col flex-1 min-w-0 relative">
                     {!isSameSenderAsPrev && (
                       <div className="flex items-baseline">
-                        <span className="font-medium text-white mr-2 hover:underline cursor-pointer">{msg.senderId?.username}</span>
+                        <span className="font-medium text-white mr-2 hover:underline cursor-pointer">{msg.sender?.username}</span>
                         <span className="text-xs text-text-muted">
                           {new Date(msg.createdAt).toLocaleDateString()} {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     )}
                     
-                    {editingMessageId === msg._id ? (
-                      <form onSubmit={(e) => handleEditSubmit(e, msg._id)} className="mt-1 flex flex-col">
+                    {editingMessageId === msg.id ? (
+                      <form onSubmit={(e) => handleEditSubmit(e, msg.id)} className="mt-1 flex flex-col">
                         <input
                           autoFocus
                           type="text"
                           value={editContent}
                           onChange={(e) => setEditContent(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') setEditingMessageId(null);
-                          }}
+                          onKeyDown={(e) => { if (e.key === 'Escape') setEditingMessageId(null); }}
                           className="w-full bg-[#383a40] text-text-normal p-2 rounded border border-transparent focus:outline-none focus:border-[#00a8fc]"
                         />
                         <div className="text-xs mt-1">
-                          escape to <span className="text-blue-400 cursor-pointer hover:underline" onClick={() => setEditingMessageId(null)}>cancel</span> • enter to <span className="text-blue-400 cursor-pointer hover:underline" onClick={(e) => handleEditSubmit(e as any, msg._id)}>save</span>
+                          escape to <span className="text-blue-400 cursor-pointer hover:underline" onClick={() => setEditingMessageId(null)}>cancel</span> • enter to <span className="text-blue-400 cursor-pointer hover:underline" onClick={(e) => handleEditSubmit(e as any, msg.id)}>save</span>
                         </div>
                       </form>
                     ) : (
@@ -318,21 +337,18 @@ export const ChatArea: React.FC = () => {
                     )}
                     
                     {/* Hover Actions Toolbar */}
-                    {user?._id === msg.senderId?._id && !msg.deleted && editingMessageId !== msg._id && (
+                    {user?.id === msg.sender?.id && !msg.deleted && editingMessageId !== msg.id && (
                       <div className="absolute right-0 -top-4 opacity-0 group-hover:opacity-100 bg-[#313338] border border-divider shadow-sm rounded flex items-center overflow-hidden transition-opacity">
-                        <button 
+                        <button
                           className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors"
-                          onClick={() => {
-                            setEditingMessageId(msg._id);
-                            setEditContent(msg.content);
-                          }}
+                          onClick={() => { setEditingMessageId(msg.id); setEditContent(msg.content); }}
                           title="Edit"
                         >
                           <Edit2 size={16} />
                         </button>
-                        <button 
+                        <button
                           className="p-1.5 text-red-500 hover:text-red-400 hover:bg-white/10 transition-colors"
-                          onClick={() => handleDeleteMessage(msg._id)}
+                          onClick={() => handleDeleteMessage(msg.id)}
                           title="Delete"
                         >
                           <Trash2 size={16} />
@@ -386,16 +402,22 @@ export const ChatArea: React.FC = () => {
             </div>
           )}
           <form onSubmit={handleSendMessage} className={`bg-channel-bg flex items-center px-4 py-2 ${pendingFiles.length > 0 ? 'rounded-b-lg' : 'rounded-lg'}`}>
-            <input 
-              type="file" 
-              multiple 
-              className="hidden" 
-              ref={fileInputRef} 
-              onChange={handleFileSelect} 
+            <input
+              type="file"
+              multiple
+              className="hidden"
+              ref={fileInputRef}
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  setPendingFiles(Array.from(e.target.files));
+                }
+                e.target.value = '';
+              }}
             />
-            <button 
-              type="button" 
-              className="text-interactive-normal hover:text-interactive-hover mr-4"
+            <button
+              type="button"
+              tabIndex={-1}
+              className="text-interactive-normal hover:text-interactive-hover mr-4 shrink-0"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
             >
@@ -406,11 +428,18 @@ export const ChatArea: React.FC = () => {
               value={message}
               onChange={handleTyping}
               disabled={isUploading}
-              placeholder={channel ? `Message #${channel.name}` : `Message`}
+              placeholder={channel ? `Message #${channel.name}` : 'Message'}
               className="flex-1 bg-transparent text-text-normal focus:outline-none py-1.5 disabled:opacity-50"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage(e as any);
+                }
+              }}
             />
-            <button 
-              type="submit" 
+            <button
+              type="submit"
+              tabIndex={-1}
               disabled={isUploading || (!message.trim() && pendingFiles.length === 0)}
               className={`${message.trim() || pendingFiles.length > 0 ? 'text-primary' : 'text-interactive-normal'} ml-2 transition-colors disabled:opacity-50 flex items-center`}
             >

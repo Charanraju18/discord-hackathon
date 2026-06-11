@@ -83,15 +83,17 @@ async def get_server_members(
     server = await Server.get(s_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
-        
+
     populated_members = []
     for m_id in server.members:
         u = await User.get(m_id)
         if u:
             populated_members.append({
-                "userId": u.model_dump(),
-                "role": "member",
-                "joinedAt": str(datetime.utcnow())
+                "id": str(u.id),
+                "username": u.username,
+                "email": u.email,
+                "isOnline": u.isOnline,
+                "role": "owner" if u.id == server.ownerId else "member"
             })
     return populated_members
 

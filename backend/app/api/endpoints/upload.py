@@ -1,45 +1,43 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from typing import List
 import cloudinary
 import cloudinary.uploader
-import os
 
+from app.core.config import settings
 from app.api.deps import get_current_user
 from app.models.user import User
 
 router = APIRouter()
 
-# Configure cloudinary here. Ideally from environment variables, but falling back for the hackathon
 cloudinary.config(
-    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.getenv("CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CLOUDINARY_API_SECRET")
+    cloud_name=settings.cloudinary_cloud_name,
+    api_key=settings.cloudinary_api_key,
+    api_secret=settings.cloudinary_api_secret
 )
 
-@router.post("/")
-async def upload_file(
-    file: UploadFile = File(...),
+@router.post("")
+async def upload_files(
+    attachments: List[UploadFile] = File(...),
     current_user: User = Depends(get_current_user)
 ):
-    try:
-        # Check size and type if needed
-        # Cloudinary supports direct upload from file stream
-        result = cloudinary.uploader.upload(
-            file.file,
-            resource_type="auto",
-            folder="discord_clone_uploads"
-        )
-        
-        return {
-            "success": True,
-            "data": {
+    results = []
+    for file in attachments:
+        try:
+            result = cloudinary.uploader.upload(
+                file.file,
+                resource_type="auto",
+                folder="discord_clone_uploads"
+            )
+            results.append({
                 "url": result.get("secure_url"),
-                "filename": file.filename,
-                "contentType": file.content_type,
-                "public_id": result.get("public_id"),
-                "format": result.get("format"),
-                "resource_type": result.get("resource_type")
-            }
-        }
-    except Exception as e:
-        print("Upload Error:", e)
-        raise HTTPException(status_code=500, detail="Failed to upload file")
+                "publicId": result.get("public_id"),
+                "fileName": file.filename,
+                "fileSize": result.get("bytes", 0),
+                "mimeType": file.content_type or "application/octet-stream",
+                "resourceType": result.get("resource_type", "raw"),
+                "uploadedAt": None
+            })
+        except Exception as e:
+            print("Upload Error:", e)
+            raise HTTPException(status_code=500, detail=f"Failed to upload {file.filename}")
+    return results

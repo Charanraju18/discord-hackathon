@@ -4,6 +4,7 @@ import axios from "axios";
 import { Plus } from "lucide-react";
 import { API_BASE_URL } from "../../config";
 import discordIcons from "../../assets/discord-icon.png";
+import { getServerInitials } from "../../utils/serverInitials";
 
 interface ServerSidebarProps {
   servers: any[];
@@ -60,7 +61,7 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
             `w-12 h-12 rounded-[24px] flex items-center justify-center bg-background text-white transition-all duration-200 hover:rounded-[16px] hover:bg-primary ${isActive ? "bg-primary rounded-[16px]" : ""}`
           }
         >
-          {server.name.charAt(0).toUpperCase()}
+          <span className="text-xs font-bold leading-none">{getServerInitials(server.name)}</span>
         </NavLink>
       ))}
 

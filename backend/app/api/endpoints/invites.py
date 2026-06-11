@@ -19,6 +19,13 @@ async def get_invite(code: str):
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
         
+    from app.models.user import User as UserModel
+    online_count = 0
+    for m_id in server.members:
+        u = await UserModel.get(m_id)
+        if u and u.isOnline:
+            online_count += 1
+
     return {
         "invite": {
             "code": invite.code,
@@ -26,7 +33,10 @@ async def get_invite(code: str):
         },
         "server": {
             "name": server.name,
-            "icon": server.icon
+            "icon": server.icon,
+            "memberCount": len(server.members),
+            "onlineCount": online_count,
+            "createdAt": str(server.createdAt)
         }
     }
 
