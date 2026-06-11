@@ -1,3 +1,4 @@
+import asyncio
 from app.sockets import sio
 from app.models.user import User
 from beanie import PydanticObjectId as ObjectId
@@ -6,6 +7,10 @@ from datetime import datetime
 # Map sid to user_id and vice versa
 sid_to_user = {}
 user_to_sid = {}
+
+# Voice Rooms State
+# format: { channel_id: { "participants": { user_id: { "muted": False, "deafened": False, "video": False, "screenSharing": False, "sid": "socket_id" } } } }
+voice_rooms = {}
 
 @sio.on("connect")
 async def connect(sid, environ, auth):
@@ -42,6 +47,19 @@ async def disconnect(sid):
         if user_id in user_to_sid:
             del user_to_sid[user_id]
             
+        # Cleanup voice rooms
+        empty_rooms = []
+        for channel_id, room_data in voice_rooms.items():
+            if user_id in room_data["participants"]:
+                del room_data["participants"][user_id]
+                await sio.leave_room(sid, f"voice_{channel_id}")
+                asyncio.create_task(sio.emit("user_left_voice", {"userId": user_id, "channelId": channel_id}, room=f"voice_{channel_id}"))
+                if not room_data["participants"]:
+                    empty_rooms.append(channel_id)
+        
+        for room in empty_rooms:
+            del voice_rooms[room]
+            
         try:
             user = await User.get(ObjectId(user_id))
             if user:
@@ -56,15 +74,178 @@ async def disconnect(sid):
 async def join_channel(sid, channel_id):
     if not channel_id:
         return
-    sio.enter_room(sid, str(channel_id))
+    await sio.enter_room(sid, str(channel_id))
     print(f"Client {sid} joined channel {channel_id}")
 
 @sio.on("leave-channel")
 async def leave_channel(sid, channel_id):
     if not channel_id:
         return
-    sio.leave_room(sid, str(channel_id))
+    await sio.leave_room(sid, str(channel_id))
     print(f"Client {sid} left channel {channel_id}")
+
+from app.models.server import Server
+
+@sio.on("join_voice_channel")
+async def join_voice_channel(sid, channel_id):
+    if not channel_id:
+        return
+        
+    user_id = sid_to_user.get(sid)
+    if not user_id:
+        return
+        
+    try:
+        channel = await Channel.get(ObjectId(channel_id))
+        if not channel:
+            return
+            
+        server = await Server.get(channel.serverId)
+        if not server or ObjectId(user_id) not in server.members:
+            # For owner: checking if ownerId == user_id
+            if server and server.ownerId != ObjectId(user_id):
+                print(f"User {user_id} not allowed to join voice channel {channel_id}")
+                return
+
+        user = await User.get(ObjectId(user_id))
+        username = user.username if user else "User"
+
+        # Initialize room if not exists
+        if channel_id not in voice_rooms:
+            voice_rooms[channel_id] = {"participants": {}}
+            
+        # Check if user is already in another voice channel, remove them first
+        for c_id, room_data in voice_rooms.items():
+            if user_id in room_data["participants"]:
+                del room_data["participants"][user_id]
+                await sio.leave_room(sid, f"voice_{c_id}")
+                await sio.emit("user_left_voice", {"userId": user_id, "channelId": c_id}, room=f"voice_{c_id}")
+                
+        # Add user to room
+        voice_rooms[channel_id]["participants"][user_id] = {
+            "muted": False,
+            "deafened": False,
+            "video": False,
+            "screenSharing": False,
+            "sid": sid,
+            "username": username
+        }
+        
+        # Enter Socket.IO room specifically for voice (different from text channel room)
+        voice_room_id = f"voice_{channel_id}"
+        await sio.enter_room(sid, voice_room_id)
+        
+        print(f"User {user_id} joined voice channel {channel_id}")
+        
+        # Broadcast user joined to others in the room
+        await sio.emit("user_joined_voice", {
+            "userId": user_id, 
+            "channelId": channel_id,
+            "state": voice_rooms[channel_id]["participants"][user_id]
+        }, room=voice_room_id, skip_sid=sid)
+        
+        # Send full room state to the joining user
+        await sio.emit("voice_room_state", {
+            "channelId": channel_id,
+            "participants": voice_rooms[channel_id]["participants"]
+        }, to=sid)
+        
+    except Exception as e:
+        print(f"Error joining voice channel: {e}")
+
+@sio.on("leave_voice_channel")
+async def handle_leave_voice_channel(sid, channel_id):
+    if not channel_id:
+        return
+        
+    user_id = sid_to_user.get(sid)
+    if not user_id:
+        return
+        
+    if channel_id in voice_rooms and user_id in voice_rooms[channel_id]["participants"]:
+        del voice_rooms[channel_id]["participants"][user_id]
+        voice_room_id = f"voice_{channel_id}"
+        await sio.leave_room(sid, voice_room_id)
+        
+        await sio.emit("user_left_voice", {
+            "userId": user_id,
+            "channelId": channel_id
+        }, room=voice_room_id)
+        
+        # Clean up empty rooms
+        if not voice_rooms[channel_id]["participants"]:
+            del voice_rooms[channel_id]
+            
+    print(f"User {user_id} left voice channel {channel_id}")
+
+# WebRTC Signaling Events
+@sio.on("offer")
+async def handle_offer(sid, data):
+    target_user_id = data.get("targetUserId")
+    if not target_user_id or target_user_id not in user_to_sid:
+        return
+    
+    target_sid = user_to_sid[target_user_id]
+    sender_id = sid_to_user.get(sid)
+    
+    await sio.emit("offer", {
+        "senderId": sender_id,
+        "offer": data.get("offer")
+    }, to=target_sid)
+
+@sio.on("answer")
+async def handle_answer(sid, data):
+    target_user_id = data.get("targetUserId")
+    if not target_user_id or target_user_id not in user_to_sid:
+        return
+    
+    target_sid = user_to_sid[target_user_id]
+    sender_id = sid_to_user.get(sid)
+    
+    await sio.emit("answer", {
+        "senderId": sender_id,
+        "answer": data.get("answer")
+    }, to=target_sid)
+
+@sio.on("ice_candidate")
+async def handle_ice_candidate(sid, data):
+    target_user_id = data.get("targetUserId")
+    if not target_user_id or target_user_id not in user_to_sid:
+        return
+        
+    target_sid = user_to_sid[target_user_id]
+    sender_id = sid_to_user.get(sid)
+    
+    await sio.emit("ice_candidate", {
+        "senderId": sender_id,
+        "candidate": data.get("candidate")
+    }, to=target_sid)
+
+# State Update Events
+@sio.on("update_voice_state")
+async def handle_update_voice_state(sid, data):
+    user_id = sid_to_user.get(sid)
+    channel_id = data.get("channelId")
+    updates = data.get("updates", {})
+    
+    if not user_id or not channel_id:
+        return
+        
+    if channel_id in voice_rooms and user_id in voice_rooms[channel_id]["participants"]:
+        room_participant = voice_rooms[channel_id]["participants"][user_id]
+        
+        # Apply updates
+        if "muted" in updates: room_participant["muted"] = updates["muted"]
+        if "deafened" in updates: room_participant["deafened"] = updates["deafened"]
+        if "video" in updates: room_participant["video"] = updates["video"]
+        if "screenSharing" in updates: room_participant["screenSharing"] = updates["screenSharing"]
+        
+        await sio.emit("voice_state_updated", {
+            "userId": user_id,
+            "channelId": channel_id,
+            "state": room_participant
+        }, room=f"voice_{channel_id}")
+
 
 from app.models.message import Message
 from app.models.channel import Channel
@@ -83,7 +264,6 @@ async def handle_new_message(sid, data):
     try:
         new_msg = Message(
             channelId=ObjectId(channel_id),
-            serverId=ObjectId(data.get("serverId")),
             senderId=ObjectId(user_id),
             content=content,
             attachments=attachments

@@ -3,7 +3,7 @@ import { Routes, Route, Outlet } from 'react-router-dom';
 import axios from 'axios';
 import { ServerSidebar } from '../features/servers/ServerSidebar';
 import { ChannelSidebar } from '../features/channels/ChannelSidebar';
-import { ChatArea } from '../features/chat/ChatArea';
+import { ChannelRouter } from '../features/channels/ChannelRouter';
 import { API_BASE_URL } from '../config';
 import { SecondarySidebarLayout } from './SecondarySidebarLayout';
 import { FriendsSidebar } from '../features/friends/FriendsSidebar';
@@ -61,7 +61,7 @@ export const AppLayout: React.FC = () => {
 
         <Route path=":serverId" element={<ServerLayout />}>
           <Route path="" element={<div className="flex-1 bg-background flex items-center justify-center text-text-muted">Select a channel</div>} />
-          <Route path=":channelId" element={<ChatArea />} />
+          <Route path=":channelId" element={<ChannelRouter />} />
         </Route>
       </Routes>
     </div>

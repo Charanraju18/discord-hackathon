@@ -35,7 +35,7 @@ async def get_channels(
         } for c in channels
     ]
 
-@router.post("/")
+@router.post("")
 async def create_channel(
     req: dict, # expecting { serverId: str, name: str, type: str }
     current_user: User = Depends(get_current_user)

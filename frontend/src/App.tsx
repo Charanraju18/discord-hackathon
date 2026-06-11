@@ -55,15 +55,19 @@ function AppRoutes() {
 
 import { SocketProvider } from "./features/socket/SocketContext";
 import { NotificationProvider } from "./features/notifications/NotificationContext";
+import { VoiceProvider } from "./features/rtc/hooks/useWebRTC";
+
 // hello world
 function App() {
   return (
     <AuthProvider>
       <SocketProvider>
         <NotificationProvider>
-          <Router>
-            <AppRoutes />
-          </Router>
+          <VoiceProvider>
+            <Router>
+              <AppRoutes />
+            </Router>
+          </VoiceProvider>
         </NotificationProvider>
       </SocketProvider>
     </AuthProvider>
