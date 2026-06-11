@@ -53,6 +53,13 @@ async def get_user_profile(
     }
     mutual_friend_ids = my_friend_ids & target_friend_ids
 
+    # Build mutual friends user objects
+    mutual_friend_users = []
+    for fid in mutual_friend_ids:
+        u = await User.get(ObjectId(fid))
+        if u:
+            mutual_friend_users.append({"id": str(u.id), "username": u.username, "isOnline": u.isOnline})
+
     return {
         "id": str(target.id),
         "username": target.username,
@@ -61,7 +68,9 @@ async def get_user_profile(
         "lastSeen": str(target.lastSeen) if target.lastSeen else None,
         "createdAt": str(target.createdAt),
         "mutualServers": len(mutual_servers),
-        "mutualFriends": len(mutual_friend_ids)
+        "mutualFriends": len(mutual_friend_ids),
+        "mutualServersList": [{"id": str(s.id), "name": s.name, "icon": s.icon} for s in mutual_servers],
+        "mutualFriendsList": mutual_friend_users
     }
 
 @router.get("/search", response_model=List[UserResponse])

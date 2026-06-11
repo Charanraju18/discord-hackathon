@@ -6,8 +6,12 @@ from app.schemas.user import UserResponse
 
 class Attachment(BaseModel):
     url: str
-    filename: str
-    contentType: str
+    publicId: str = ""
+    fileName: str = ""
+    fileSize: int = 0
+    mimeType: str = ""
+    resourceType: str = "raw"
+    uploadedAt: Optional[datetime] = None
 
 class DirectMessageCreate(BaseModel):
     content: Optional[str] = None
