@@ -30,6 +30,7 @@ def _msg_dict(m, sender) -> dict:
         "deleted": m.deleted,
         "deletedAt": str(m.deletedAt) if m.deletedAt else None,
         "attachments": [_attachment_dict(a) for a in m.attachments],
+        "reactions": [{"emoji": r.emoji, "users": r.users} for r in getattr(m, 'reactions', [])],
         "createdAt": str(m.createdAt),
         "updatedAt": str(m.updatedAt)
     }

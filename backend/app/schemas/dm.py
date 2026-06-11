@@ -3,6 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 from beanie import PydanticObjectId as ObjectId
 from app.schemas.user import UserResponse
+from app.models.message import Reaction
 
 class Attachment(BaseModel):
     url: str
@@ -27,6 +28,7 @@ class DirectMessageResponse(BaseModel):
     deleted: bool = False
     deletedAt: Optional[datetime] = None
     attachments: List[Attachment] = []
+    reactions: List[Reaction] = []
     createdAt: datetime
     updatedAt: datetime
 

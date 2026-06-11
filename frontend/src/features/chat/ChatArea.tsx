@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Hash, PlusCircle, Send, Users, Edit2, Trash2, X, File, Loader2 } from 'lucide-react';
+import { Hash, PlusCircle, Send, Users, Edit2, Trash2, X, File, Loader2, SmilePlus, Smile } from 'lucide-react';
 import { useSocket } from '../socket/SocketContext';
 import { useAuth } from '../auth/AuthContext';
 import { MembersSidebar } from '../servers/MembersSidebar';
 import { AttachmentRenderer } from '../../components/messages/AttachmentRenderer';
+import { EmojiPickerPopup } from '../../components/messages/EmojiPickerPopup';
+import { ReactionBadge } from '../../components/messages/ReactionBadge';
 import { API_BASE_URL } from '../../config';
 
 export const ChatArea: React.FC = () => {
@@ -19,6 +21,9 @@ export const ChatArea: React.FC = () => {
   const [editContent, setEditContent] = useState('');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { socket } = useSocket();
@@ -113,12 +118,19 @@ export const ChatArea: React.FC = () => {
         }
       };
 
+      const handleReactionUpdated = (payload: any) => {
+        if (payload.channelId === channelId) {
+          setMessages(prev => prev.map(m => m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m));
+        }
+      };
+
       // Backend emits 'new-message' for channel messages
       socket.on('new-message', handleReceiveMessage);
       socket.on('user-typing', handleUserTyping);
       socket.on('user-stop-typing', handleUserStopTyping);
       socket.on('message-updated', handleMessageUpdated);
       socket.on('message-deleted', handleMessageDeleted);
+      socket.on('reaction_updated', handleReactionUpdated);
 
       return () => {
         socket.off('new-message', handleReceiveMessage);
@@ -126,6 +138,7 @@ export const ChatArea: React.FC = () => {
         socket.off('user-stop-typing', handleUserStopTyping);
         socket.off('message-updated', handleMessageUpdated);
         socket.off('message-deleted', handleMessageDeleted);
+        socket.off('reaction_updated', handleReactionUpdated);
       };
     }
   }, [channelId, socket, user?.username]);
@@ -167,6 +180,18 @@ export const ChatArea: React.FC = () => {
     }
   };
 
+  const toggleReaction = (messageId: string, emoji: string, currentReactions: any[] = []) => {
+    if (!socket || !user) return;
+    const reaction = currentReactions.find(r => r.emoji === emoji);
+    const hasReacted = reaction?.users.includes(user.id);
+    
+    if (hasReacted) {
+      socket.emit('remove_reaction', { messageId, emoji, type: 'channel' });
+    } else {
+      socket.emit('add_reaction', { messageId, emoji, type: 'channel' });
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!message.trim() && pendingFiles.length === 0) || !socket || !channelId || !user || isUploading) return;
@@ -204,6 +229,7 @@ export const ChatArea: React.FC = () => {
       sender: { id: user.id, username: user.username, email: user.email, isOnline: true },
       content: message,
       attachments: uploadedAttachments,
+      reactions: [],
       isEdited: false,
       deleted: false,
       createdAt: new Date().toISOString(),
@@ -337,22 +363,59 @@ export const ChatArea: React.FC = () => {
                     )}
                     
                     {/* Hover Actions Toolbar */}
-                    {user?.id === msg.sender?.id && !msg.deleted && editingMessageId !== msg.id && (
+                    {!msg.deleted && editingMessageId !== msg.id && (
                       <div className="absolute right-0 -top-4 opacity-0 group-hover:opacity-100 bg-[#313338] border border-divider shadow-sm rounded flex items-center overflow-hidden transition-opacity">
                         <button
-                          className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors"
-                          onClick={() => { setEditingMessageId(msg.id); setEditContent(msg.content); }}
-                          title="Edit"
+                          className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors relative"
+                          onClick={() => setReactionPickerMessageId(reactionPickerMessageId === msg.id ? null : msg.id)}
+                          title="Add Reaction"
                         >
-                          <Edit2 size={16} />
+                          <SmilePlus size={16} />
                         </button>
-                        <button
-                          className="p-1.5 text-red-500 hover:text-red-400 hover:bg-white/10 transition-colors"
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {user?.id === msg.sender?.id && (
+                          <>
+                            <button
+                              className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors"
+                              onClick={() => { setEditingMessageId(msg.id); setEditContent(msg.content); }}
+                              title="Edit"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              className="p-1.5 text-red-500 hover:text-red-400 hover:bg-white/10 transition-colors"
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {reactionPickerMessageId === msg.id && (
+                      <EmojiPickerPopup
+                        position="top-right"
+                        onClose={() => setReactionPickerMessageId(null)}
+                        onEmojiSelect={(emoji) => {
+                          socket?.emit('add_reaction', { messageId: msg.id, emoji: emoji.emoji, type: 'channel' });
+                        }}
+                      />
+                    )}
+
+                    {/* Reactions */}
+                    {msg.reactions && msg.reactions.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {msg.reactions.map((r: any) => (
+                          <ReactionBadge
+                            key={r.emoji}
+                            emoji={r.emoji}
+                            count={r.users.length}
+                            hasReacted={r.users.includes(user?.id)}
+                            users={r.users} // Ideally we map userIds to usernames here if possible, for now just IDs
+                            onClick={() => toggleReaction(msg.id, r.emoji, msg.reactions)}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>
@@ -422,6 +485,20 @@ export const ChatArea: React.FC = () => {
               disabled={isUploading}
             >
               <PlusCircle size={24} />
+            </button>
+            <button
+              type="button"
+              className="text-interactive-normal hover:text-interactive-hover mr-4 shrink-0 relative"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            >
+              <Smile size={24} />
+              {showEmojiPicker && (
+                <EmojiPickerPopup
+                  position="top-right"
+                  onClose={() => setShowEmojiPicker(false)}
+                  onEmojiSelect={(emoji) => setMessage(prev => prev + emoji.emoji)}
+                />
+              )}
             </button>
             <input
               type="text"

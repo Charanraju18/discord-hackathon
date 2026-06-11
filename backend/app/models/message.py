@@ -13,6 +13,11 @@ class Attachment(BaseModel):
     resourceType: str
     uploadedAt: Optional[datetime] = None
 
+class Reaction(BaseModel):
+    emoji: str
+    users: List[str]
+
+
 class Message(Document):
     content: Optional[str] = None
     senderId: ObjectId
@@ -22,6 +27,7 @@ class Message(Document):
     deleted: bool = False
     deletedAt: Optional[datetime] = None
     attachments: List[Attachment] = []
+    reactions: List[Reaction] = []
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
 

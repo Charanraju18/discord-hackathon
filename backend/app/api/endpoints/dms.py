@@ -1,4 +1,6 @@
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, status
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 from typing import List
 from beanie import PydanticObjectId as ObjectId
@@ -105,6 +107,7 @@ async def get_messages(
                 "deleted": m.deleted,
                 "deletedAt": str(m.deletedAt) if m.deletedAt else None,
                 "attachments": [a.model_dump() for a in m.attachments],
+                "reactions": [{"emoji": r.emoji, "users": r.users} for r in getattr(m, 'reactions', [])],
                 "createdAt": str(m.createdAt) if m.createdAt else None,
                 "updatedAt": str(m.updatedAt) if m.updatedAt else None
             })
@@ -144,6 +147,7 @@ async def send_message(
         "deleted": new_msg.deleted,
         "deletedAt": str(new_msg.deletedAt) if new_msg.deletedAt else None,
         "attachments": [{"url": a.url, "publicId": a.publicId, "fileName": a.fileName, "fileSize": a.fileSize, "mimeType": a.mimeType, "resourceType": a.resourceType, "uploadedAt": str(a.uploadedAt) if a.uploadedAt else None} for a in new_msg.attachments],
+        "reactions": [{"emoji": r.emoji, "users": r.users} for r in getattr(new_msg, 'reactions', [])],
         "createdAt": str(new_msg.createdAt),
         "updatedAt": str(new_msg.updatedAt)
     }

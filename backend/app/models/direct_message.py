@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import Field
 from beanie import Document
 from beanie import PydanticObjectId as ObjectId
-from app.models.message import Attachment
+from app.models.message import Attachment, Reaction
 
 class DirectMessage(Document):
     conversationId: ObjectId
@@ -14,6 +14,7 @@ class DirectMessage(Document):
     deleted: bool = False
     deletedAt: Optional[datetime] = None
     attachments: List[Attachment] = []
+    reactions: List[Reaction] = []
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
 
