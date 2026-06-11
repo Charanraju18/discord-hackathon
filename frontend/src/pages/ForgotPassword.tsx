@@ -1,42 +1,31 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth } from '../features/auth/AuthContext';
 import { API_BASE_URL } from '../config';
 import loginbg from '../assets/loginbg.svg';
 
-export const Login: React.FC = () => {
+export const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
-  const navigate = useNavigate();
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
+    setStatus('loading');
+    setMessage('');
     try {
-      const res = await axios.post(`${API_BASE_URL}/api/auth/login`, { email, password });
-      // In FastAPI, it might return the data directly without `.success` / `.data` wrapper.
-      // So check if res.data.token exists.
-      const data = res.data.data || res.data;
-      if (data.token) {
-        login(data);
-        const pendingInvite = localStorage.getItem('pendingInvite');
-        if (pendingInvite) {
-          navigate(`/invite/${pendingInvite}`);
-        } else {
-          navigate('/channels/@me');
-        }
+      const res = await axios.post(`${API_BASE_URL}/api/auth/forgot-password`, { email });
+      setStatus('success');
+      // For hackathon: log debug token if provided
+      if (res.data.debug_token) {
+        console.log("Debug Reset Token:", res.data.debug_token);
+        setMessage(`Success: ${res.data.message} (Check console for debug token)`);
       } else {
-        setError('Login failed');
+        setMessage(res.data.message || 'If that email exists, a reset link has been sent.');
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.response?.data?.message || 'Failed to login');
-    } finally {
-      setIsLoading(false);
+      setStatus('error');
+      setMessage(err.response?.data?.detail || err.response?.data?.message || 'Failed to send request');
     }
   };
 
@@ -54,13 +43,18 @@ export const Login: React.FC = () => {
 
       <div className="relative bg-[#313338] p-8 rounded-lg shadow-2xl w-full max-w-md z-10 transition-transform duration-300">
         <div className="text-center mb-6">
-          <h2 className="text-[24px] font-bold text-[#f2f3f5] mb-2 tracking-wide">Welcome back!</h2>
-          <p className="text-[16px] text-[#b5bac1]">We're so excited to see you again!</p>
+          <h2 className="text-[24px] font-bold text-[#f2f3f5] mb-2 tracking-wide">Reset Password</h2>
+          <p className="text-[16px] text-[#b5bac1]">Enter your email and we'll send you a reset link.</p>
         </div>
 
-        {error && (
+        {status === 'error' && (
           <div className="bg-[#f23f42] text-white text-sm px-3 py-2 rounded mb-4 text-center">
-            {error}
+            {message}
+          </div>
+        )}
+        {status === 'success' && (
+          <div className="bg-[#23a559] text-white text-sm px-3 py-2 rounded mb-4 text-center">
+            {message}
           </div>
         )}
 
@@ -77,38 +71,22 @@ export const Login: React.FC = () => {
               required
             />
           </div>
-          <div>
-            <label className="block text-[12px] font-bold text-[#b5bac1] uppercase mb-2">
-              Password <span className="text-[#f23f42]">*</span>
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#1e1f22] text-[#dbdee1] px-3 py-[10px] rounded focus:bg-[#1e1f22] border-none outline-none ring-0 focus:ring-1 focus:ring-[#00a8fc]"
-              required
-            />
-            <Link to="/forgot-password" className="text-[14px] text-[#00a8fc] hover:underline mt-2 inline-block">
-              Forgot your password?
-            </Link>
-          </div>
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={status === 'loading'}
             className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white font-semibold py-[10px] rounded transition duration-200 mt-2 flex items-center justify-center"
           >
-            {isLoading ? (
+            {status === 'loading' ? (
               <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
             ) : (
-              'Log In'
+              'Send Reset Link'
             )}
           </button>
         </form>
 
         <div className="mt-4 text-[14px] text-[#949ba4]">
-          Need an account?{' '}
-          <Link to="/register" className="text-[#00a8fc] hover:underline font-medium">
-            Register
+          <Link to="/login" className="text-[#00a8fc] hover:underline font-medium">
+            Back to login
           </Link>
         </div>
       </div>

@@ -1,2 +1,28 @@
-node_modules
+# Virtual Environment
+venv
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Test cache
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+
+# Ruff
+.ruff_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Environment variables
 .env
+.env.*
+
+node_modules

@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+motor
+beanie
+python-socketio
+pydantic
+pydantic-settings
+bcrypt
+pyjwt
+python-dotenv
+cloudinary
+python-multipart
+email-validator

@@ -1,0 +1,51 @@
+from fastapi import APIRouter, Depends, HTTPException
+from beanie import PydanticObjectId as ObjectId
+from datetime import datetime
+
+from app.models.user import User
+from app.models.server import Server
+from app.models.invite import Invite
+from app.api.deps import get_current_user
+
+router = APIRouter()
+
+@router.get("/{code}")
+async def get_invite(code: str):
+    invite = await Invite.find_one({"code": code})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found or expired")
+        
+    server = await Server.get(invite.serverId)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+        
+    return {
+        "invite": {
+            "code": invite.code,
+            "serverId": str(invite.serverId)
+        },
+        "server": {
+            "name": server.name,
+            "icon": server.icon
+        }
+    }
+
+@router.post("/{code}/join")
+async def join_invite(
+    code: str,
+    current_user: User = Depends(get_current_user)
+):
+    invite = await Invite.find_one({"code": code})
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found or expired")
+        
+    server = await Server.get(invite.serverId)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+        
+    if current_user.id in server.members:
+        return {"message": "Already a member", "serverId": str(server.id)}
+            
+    server.members.append(current_user.id)
+    await server.save()
+    return {"message": "Successfully joined server", "serverId": str(server.id)}

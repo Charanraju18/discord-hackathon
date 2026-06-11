@@ -29,11 +29,16 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 
 import { AppLayout } from "./layouts/AppLayout";
 
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
+
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/invite/:code" element={<InviteLandingPage />} />
       <Route
         path="/channels/*"

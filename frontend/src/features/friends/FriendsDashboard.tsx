@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Users } from 'lucide-react';
 import { AddFriend } from './components/AddFriend';
 import { FriendCard } from './components/FriendCard';
+import { ActiveNowPanel } from './components/ActiveNowPanel';
 import { useSocket } from '../socket/SocketContext';
 import { API_BASE_URL } from '../../config';
 
@@ -227,11 +228,15 @@ export const FriendsDashboard: React.FC<FriendsDashboardProps> = ({ activeTab, o
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-background">
-      {/* Header handled by AppLayout for tabs, but we'll render content below */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {renderContent()}
+    <div className="flex-1 flex min-h-0 bg-background">
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {renderContent()}
+        </div>
       </div>
+      {(activeTab === 'online' || activeTab === 'all' || activeTab === 'pending') && (
+        <ActiveNowPanel />
+      )}
     </div>
   );
 };
