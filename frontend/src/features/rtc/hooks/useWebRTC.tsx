@@ -1,8 +1,15 @@
-import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
-import { useSocket } from '../../socket/SocketContext';
-import { useAuth } from '../../auth/AuthContext';
-import { rtcConfig } from '../config';
-import type { VoiceParticipantState, VoiceRoomState } from '../types';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+} from "react";
+import { useSocket } from "../../socket/SocketContext";
+import { useAuth } from "../../auth/AuthContext";
+import { rtcConfig } from "../config";
+import type { VoiceParticipantState, VoiceRoomState } from "../types";
 
 interface VoiceContextType {
   currentVoiceChannelId: string | null;
@@ -20,44 +27,58 @@ interface VoiceContextType {
 
 const VoiceContext = createContext<VoiceContextType | undefined>(undefined);
 
-export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { socket, isConnected } = useSocket();
   const { user } = useAuth();
-  
-  const [currentVoiceChannelId, setCurrentVoiceChannelId] = useState<string | null>(null);
-  const [participants, setParticipants] = useState<Record<string, VoiceParticipantState>>({});
-  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
-  
+
+  const [currentVoiceChannelId, setCurrentVoiceChannelId] = useState<
+    string | null
+  >(null);
+  const [participants, setParticipants] = useState<
+    Record<string, VoiceParticipantState>
+  >({});
+  const [remoteStreams, setRemoteStreams] = useState<
+    Record<string, MediaStream>
+  >({});
+
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  
+
   const [localState, setLocalState] = useState<VoiceParticipantState>({
     muted: false,
     deafened: false,
     video: false,
     screenSharing: false,
-    sid: '',
+    sid: "",
   });
 
   const peerConnections = useRef<Record<string, RTCPeerConnection>>({});
 
   // Helper to sync local state to socket
-  const updateLocalState = useCallback((updates: Partial<VoiceParticipantState>) => {
-    if (!socket || !currentVoiceChannelId) return;
-    setLocalState(prev => {
-      const next = { ...prev, ...updates };
-      socket.emit('update_voice_state', { channelId: currentVoiceChannelId, updates });
-      return next;
-    });
-  }, [socket, currentVoiceChannelId]);
+  const updateLocalState = useCallback(
+    (updates: Partial<VoiceParticipantState>) => {
+      if (!socket || !currentVoiceChannelId) return;
+      setLocalState((prev) => {
+        const next = { ...prev, ...updates };
+        socket.emit("update_voice_state", {
+          channelId: currentVoiceChannelId,
+          updates,
+        });
+        return next;
+      });
+    },
+    [socket, currentVoiceChannelId],
+  );
 
   // Clean up all peer connections
   const cleanupRTC = useCallback(() => {
-    Object.values(peerConnections.current).forEach(pc => pc.close());
+    Object.values(peerConnections.current).forEach((pc) => pc.close());
     peerConnections.current = {};
     setRemoteStreams({});
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
       setLocalStream(null);
     }
@@ -66,74 +87,67 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Reconnection recovery
   useEffect(() => {
     if (isConnected && currentVoiceChannelId && socket) {
-      socket.emit('join_voice_channel', currentVoiceChannelId);
+      socket.emit("join_voice_channel", currentVoiceChannelId);
     }
   }, [isConnected, currentVoiceChannelId, socket]);
 
   useEffect(() => {
     if (!socket || !user) return;
 
-    socket.on('voice_room_state', (state: VoiceRoomState) => {
-      console.log('socket event: voice_room_state', state);
-      
+    socket.on("voice_room_state", (state: VoiceRoomState) => {
       const remoteParticipants = { ...state.participants };
       if (user.id in remoteParticipants) {
         delete remoteParticipants[user.id];
       }
-      
+
       setParticipants(remoteParticipants);
       setCurrentVoiceChannelId(state.channelId);
-      
+
       // If we joined, we need to create peer connections offering to all existing participants
       Object.keys(remoteParticipants).forEach(async (participantId) => {
         createPeerConnection(participantId, true);
       });
     });
 
-    socket.on('user_joined_voice', async ({ userId, channelId, state }) => {
-      console.log('socket event: user_joined_voice', { userId, channelId, state });
+    socket.on("user_joined_voice", async ({ userId, channelId, state }) => {
       if (channelId !== currentVoiceChannelId || userId === user.id) return;
-      setParticipants(prev => ({ ...prev, [userId]: state }));
+      setParticipants((prev) => ({ ...prev, [userId]: state }));
     });
 
-    socket.on('user_left_voice', ({ userId, channelId }) => {
-      console.log('socket event: user_left_voice', { userId, channelId });
+    socket.on("user_left_voice", ({ userId, channelId }) => {
       if (channelId !== currentVoiceChannelId) return;
-      setParticipants(prev => {
+      setParticipants((prev) => {
         const next = { ...prev };
         delete next[userId];
         return next;
       });
-      
+
       if (peerConnections.current[userId]) {
         peerConnections.current[userId].close();
         delete peerConnections.current[userId];
       }
-      setRemoteStreams(prev => {
+      setRemoteStreams((prev) => {
         const next = { ...prev };
         delete next[userId];
         return next;
       });
     });
 
-    socket.on('voice_state_updated', ({ userId, channelId, state }) => {
-      console.log('socket event: voice_state_updated', { userId, channelId, state });
+    socket.on("voice_state_updated", ({ userId, channelId, state }) => {
       if (channelId !== currentVoiceChannelId || userId === user.id) return;
-      setParticipants(prev => ({ ...prev, [userId]: state }));
+      setParticipants((prev) => ({ ...prev, [userId]: state }));
     });
 
     // WebRTC Signaling
     const handleOffer = async ({ senderId, offer }: any) => {
-      console.log('socket event: offer from', senderId);
       const pc = createPeerConnection(senderId, false);
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      socket.emit('answer', { targetUserId: senderId, answer });
+      socket.emit("answer", { targetUserId: senderId, answer });
     };
 
     const handleAnswer = async ({ senderId, answer }: any) => {
-      console.log('socket event: answer from', senderId);
       const pc = peerConnections.current[senderId];
       if (pc) {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
@@ -141,25 +155,24 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const handleIceCandidate = async ({ senderId, candidate }: any) => {
-      console.log('socket event: ice_candidate from', senderId);
       const pc = peerConnections.current[senderId];
       if (pc && candidate) {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       }
     };
 
-    socket.on('offer', handleOffer);
-    socket.on('answer', handleAnswer);
-    socket.on('ice_candidate', handleIceCandidate);
+    socket.on("offer", handleOffer);
+    socket.on("answer", handleAnswer);
+    socket.on("ice_candidate", handleIceCandidate);
 
     return () => {
-      socket.off('voice_room_state');
-      socket.off('user_joined_voice');
-      socket.off('user_left_voice');
-      socket.off('voice_state_updated');
-      socket.off('offer', handleOffer);
-      socket.off('answer', handleAnswer);
-      socket.off('ice_candidate', handleIceCandidate);
+      socket.off("voice_room_state");
+      socket.off("user_joined_voice");
+      socket.off("user_left_voice");
+      socket.off("voice_state_updated");
+      socket.off("offer", handleOffer);
+      socket.off("answer", handleAnswer);
+      socket.off("ice_candidate", handleIceCandidate);
     };
   }, [socket, user, currentVoiceChannelId]);
 
@@ -173,28 +186,31 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     pc.onicecandidate = (event) => {
       if (event.candidate && socket) {
-        socket.emit('ice_candidate', { targetUserId, candidate: event.candidate });
+        socket.emit("ice_candidate", {
+          targetUserId,
+          candidate: event.candidate,
+        });
       }
     };
 
     pc.ontrack = (event) => {
-      setRemoteStreams(prev => ({
+      setRemoteStreams((prev) => ({
         ...prev,
-        [targetUserId]: event.streams[0]
+        [targetUserId]: event.streams[0],
       }));
     };
 
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => {
+      localStreamRef.current.getTracks().forEach((track) => {
         pc.addTrack(track, localStreamRef.current!);
       });
     }
 
     if (isInitiator) {
       pc.createOffer()
-        .then(offer => pc.setLocalDescription(offer))
+        .then((offer) => pc.setLocalDescription(offer))
         .then(() => {
-          socket?.emit('offer', { targetUserId, offer: pc.localDescription });
+          socket?.emit("offer", { targetUserId, offer: pc.localDescription });
         });
     }
 
@@ -203,12 +219,15 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const getMediaStream = async (video: boolean = false) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video,
+      });
       setLocalStream(stream);
       localStreamRef.current = stream;
-      
+
       // Apply current mute state
-      stream.getAudioTracks().forEach(track => {
+      stream.getAudioTracks().forEach((track) => {
         track.enabled = !localState.muted;
       });
 
@@ -224,17 +243,16 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (currentVoiceChannelId) {
       leaveVoiceChannel();
     }
-    
+
     await getMediaStream(localState.video);
     if (socket) {
-      console.log('socket emit: join_voice_channel', channelId);
-      socket.emit('join_voice_channel', channelId);
+      socket.emit("join_voice_channel", channelId);
     }
   };
 
   const leaveVoiceChannel = useCallback(() => {
     if (socket && currentVoiceChannelId) {
-      socket.emit('leave_voice_channel', currentVoiceChannelId);
+      socket.emit("leave_voice_channel", currentVoiceChannelId);
     }
     setCurrentVoiceChannelId(null);
     setParticipants({});
@@ -244,7 +262,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleMute = () => {
     if (localStream) {
       const newMuted = !localState.muted;
-      localStream.getAudioTracks().forEach(t => t.enabled = !newMuted);
+      localStream.getAudioTracks().forEach((t) => (t.enabled = !newMuted));
       updateLocalState({ muted: newMuted });
     }
   };
@@ -256,56 +274,22 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const toggleVideo = async () => {
     const newVideoState = !localState.video;
-    
+
     if (newVideoState) {
       // Need to request camera
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
       // Replace tracks
       const videoTrack = stream.getVideoTracks()[0];
       if (localStreamRef.current) {
         localStreamRef.current.addTrack(videoTrack);
-        Object.entries(peerConnections.current).forEach(async ([targetUserId, pc]) => {
-          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-          if (sender) {
-            sender.replaceTrack(videoTrack);
-          } else {
-            pc.addTrack(videoTrack, localStreamRef.current!);
-            try {
-              const offer = await pc.createOffer();
-              await pc.setLocalDescription(offer);
-              socket?.emit('offer', { targetUserId, offer: pc.localDescription });
-            } catch (err) {
-              console.error('Error renegotiating video:', err);
-            }
-          }
-        });
-      }
-    } else {
-      if (localStreamRef.current) {
-        localStreamRef.current.getVideoTracks().forEach(track => {
-          track.stop();
-          localStreamRef.current!.removeTrack(track);
-        });
-      }
-    }
-    
-    updateLocalState({ video: newVideoState });
-  };
-
-  const toggleScreenShare = async () => {
-    // Screen sharing implementation for Phase 4
-    if (!localState.screenSharing) {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        const videoTrack = stream.getVideoTracks()[0];
-        
-        videoTrack.onended = () => {
-          toggleScreenShare(); // Toggle back off
-        };
-
-        if (localStreamRef.current) {
-          Object.entries(peerConnections.current).forEach(async ([targetUserId, pc]) => {
-            const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        Object.entries(peerConnections.current).forEach(
+          async ([targetUserId, pc]) => {
+            const sender = pc
+              .getSenders()
+              .find((s) => s.track?.kind === "video");
             if (sender) {
               sender.replaceTrack(videoTrack);
             } else {
@@ -313,12 +297,65 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               try {
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                socket?.emit('offer', { targetUserId, offer: pc.localDescription });
+                socket?.emit("offer", {
+                  targetUserId,
+                  offer: pc.localDescription,
+                });
               } catch (err) {
-                console.error('Error renegotiating screen share:', err);
+                console.error("Error renegotiating video:", err);
               }
             }
-          });
+          },
+        );
+      }
+    } else {
+      if (localStreamRef.current) {
+        localStreamRef.current.getVideoTracks().forEach((track) => {
+          track.stop();
+          localStreamRef.current!.removeTrack(track);
+        });
+      }
+    }
+
+    updateLocalState({ video: newVideoState });
+  };
+
+  const toggleScreenShare = async () => {
+    // Screen sharing implementation for Phase 4
+    if (!localState.screenSharing) {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+        });
+        const videoTrack = stream.getVideoTracks()[0];
+
+        videoTrack.onended = () => {
+          toggleScreenShare(); // Toggle back off
+        };
+
+        if (localStreamRef.current) {
+          Object.entries(peerConnections.current).forEach(
+            async ([targetUserId, pc]) => {
+              const sender = pc
+                .getSenders()
+                .find((s) => s.track?.kind === "video");
+              if (sender) {
+                sender.replaceTrack(videoTrack);
+              } else {
+                pc.addTrack(videoTrack, localStreamRef.current!);
+                try {
+                  const offer = await pc.createOffer();
+                  await pc.setLocalDescription(offer);
+                  socket?.emit("offer", {
+                    targetUserId,
+                    offer: pc.localDescription,
+                  });
+                } catch (err) {
+                  console.error("Error renegotiating screen share:", err);
+                }
+              }
+            },
+          );
         }
         updateLocalState({ screenSharing: true });
       } catch (err) {
@@ -329,14 +366,14 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (localState.video) {
         toggleVideo(); // restart camera
       } else {
-        Object.values(peerConnections.current).forEach(pc => {
-           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-           if (sender && localStreamRef.current) {
-              // We need to revert to nothing or camera
-              if (localStreamRef.current.getVideoTracks().length > 0) {
-                 sender.replaceTrack(localStreamRef.current.getVideoTracks()[0]);
-              }
-           }
+        Object.values(peerConnections.current).forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+          if (sender && localStreamRef.current) {
+            // We need to revert to nothing or camera
+            if (localStreamRef.current.getVideoTracks().length > 0) {
+              sender.replaceTrack(localStreamRef.current.getVideoTracks()[0]);
+            }
+          }
         });
       }
       updateLocalState({ screenSharing: false });
@@ -344,19 +381,21 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   return (
-    <VoiceContext.Provider value={{
-      currentVoiceChannelId,
-      participants,
-      joinVoiceChannel,
-      leaveVoiceChannel,
-      toggleMute,
-      toggleDeafen,
-      toggleVideo,
-      toggleScreenShare,
-      localState,
-      remoteStreams,
-      localStream
-    }}>
+    <VoiceContext.Provider
+      value={{
+        currentVoiceChannelId,
+        participants,
+        joinVoiceChannel,
+        leaveVoiceChannel,
+        toggleMute,
+        toggleDeafen,
+        toggleVideo,
+        toggleScreenShare,
+        localState,
+        remoteStreams,
+        localStream,
+      }}
+    >
       {children}
     </VoiceContext.Provider>
   );
@@ -365,7 +404,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 export const useVoice = () => {
   const context = useContext(VoiceContext);
   if (context === undefined) {
-    throw new Error('useVoice must be used within a VoiceProvider');
+    throw new Error("useVoice must be used within a VoiceProvider");
   }
   return context;
 };
