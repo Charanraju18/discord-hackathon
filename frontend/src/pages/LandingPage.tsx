@@ -71,7 +71,7 @@ export const LandingPage: React.FC = () => {
               to="/register"
               className="w-full sm:w-auto bg-[#white] hover:text-[#5865F2] text-[#111214] bg-white px-8 py-4 rounded-full text-lg font-bold transition-all flex items-center justify-center gap-2 transform hover:-translate-y-1 shadow-xl"
             >
-              Open in Browser
+              Register for Discord
             </Link>
             <Link
               to="/login"

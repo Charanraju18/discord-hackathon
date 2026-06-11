@@ -228,11 +228,10 @@ export const FriendsDashboard: React.FC = () => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`relative px-3 py-1 rounded text-sm font-medium transition-colors ${
-              activeTab === tab.id
+            className={`relative px-3 py-1 rounded text-sm font-medium transition-colors ${activeTab === tab.id
                 ? 'bg-white/10 text-white'
                 : 'text-text-muted hover:bg-white/5 hover:text-interactive-hover'
-            } ${tab.id === 'add' ? '!text-white !bg-[#248046] hover:!bg-[#1a6334]' : ''}`}
+              } ${tab.id === 'add' ? '!text-white !bg-[#248046] hover:!bg-[#1a6334]' : ''}`}
           >
             {tab.label}
             {tab.id === 'pending' && pendingCount > 0 && (
