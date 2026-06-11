@@ -331,13 +331,22 @@ export const DirectMessageView: React.FC = () => {
 
                     {/* Hover Actions Toolbar */}
                     {!msg.deleted && editingMessageId !== msg.id && (
-                      <div className="absolute right-0 -top-4 opacity-0 group-hover:opacity-100 bg-background border border-divider shadow-sm rounded flex items-center overflow-hidden transition-opacity">
+                      <div className={`absolute right-0 -top-4 ${reactionPickerMessageId === msg.id ? 'opacity-100 z-50' : 'opacity-0 group-hover:opacity-100'} bg-background border border-divider shadow-sm rounded flex items-center transition-opacity`}>
                         <button
                           className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors relative"
                           onClick={() => setReactionPickerMessageId(reactionPickerMessageId === msg.id ? null : msg.id)}
                           title="Add Reaction"
                         >
                           <SmilePlus size={16} />
+                          {reactionPickerMessageId === msg.id && (
+                            <EmojiPickerPopup
+                              position="top-right"
+                              onClose={() => setReactionPickerMessageId(null)}
+                              onEmojiSelect={(emoji) => {
+                                socket?.emit('add_reaction', { messageId: msg.id, emoji: emoji.emoji, type: 'dm' });
+                              }}
+                            />
+                          )}
                         </button>
                         {isOwn && (
                           <>
@@ -358,16 +367,6 @@ export const DirectMessageView: React.FC = () => {
                           </>
                         )}
                       </div>
-                    )}
-
-                    {reactionPickerMessageId === msg.id && (
-                      <EmojiPickerPopup
-                        position="top-right"
-                        onClose={() => setReactionPickerMessageId(null)}
-                        onEmojiSelect={(emoji) => {
-                          socket?.emit('add_reaction', { messageId: msg.id, emoji: emoji.emoji, type: 'dm' });
-                        }}
-                      />
                     )}
 
                     {/* Reactions */}
