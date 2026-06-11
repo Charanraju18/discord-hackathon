@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { InviteLandingPage } from "./features/servers/InviteLandingPage";
+import { LandingPage } from "./pages/LandingPage";
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { user, loading } = useAuth();
@@ -35,6 +36,7 @@ import { ResetPassword } from "./pages/ResetPassword";
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
