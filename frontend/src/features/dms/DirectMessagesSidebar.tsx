@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useSocket } from '../socket/SocketContext';
 import { API_BASE_URL } from '../../config';
@@ -7,6 +7,7 @@ import { API_BASE_URL } from '../../config';
 export const DirectMessagesSidebar: React.FC = () => {
   const [conversations, setConversations] = useState<any[]>([]);
   const { onlineUsers, socket, presenceOverrides, unreadDMs } = useSocket();
+  const location = useLocation();
 
   const fetchConversations = async () => {
     try {
@@ -23,6 +24,15 @@ export const DirectMessagesSidebar: React.FC = () => {
   useEffect(() => {
     fetchConversations();
   }, []);
+
+  // When navigating to a DM conversation not yet in the list (e.g. just started), refetch
+  useEffect(() => {
+    const match = location.pathname.match(/\/@me\/([^/]+)/);
+    const convId = match?.[1];
+    if (convId && !conversations.some(c => c.id === convId)) {
+      fetchConversations();
+    }
+  }, [location.pathname]);
 
   // Bring conversations with unread messages to the front of the list
   useEffect(() => {

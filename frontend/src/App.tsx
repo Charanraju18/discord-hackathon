@@ -1,3 +1,4 @@
+import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,7 +10,7 @@ import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { InviteLandingPage } from "./features/servers/InviteLandingPage";
 
-const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -56,19 +57,21 @@ function AppRoutes() {
 import { SocketProvider } from "./features/socket/SocketContext";
 import { NotificationProvider } from "./features/notifications/NotificationContext";
 import { VoiceProvider } from "./features/rtc/hooks/useWebRTC";
+import { ServersProvider } from "./features/servers/ServersContext";
 
-// hello world
 function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <NotificationProvider>
-          <VoiceProvider>
-            <Router>
-              <AppRoutes />
-            </Router>
-          </VoiceProvider>
-        </NotificationProvider>
+        <ServersProvider>
+          <NotificationProvider>
+            <VoiceProvider>
+              <Router>
+                <AppRoutes />
+              </Router>
+            </VoiceProvider>
+          </NotificationProvider>
+        </ServersProvider>
       </SocketProvider>
     </AuthProvider>
   );

@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Routes, Route, Outlet } from 'react-router-dom';
-import axios from 'axios';
 import { ServerSidebar } from '../features/servers/ServerSidebar';
 import { ChannelSidebar } from '../features/channels/ChannelSidebar';
 import { ChannelRouter } from '../features/channels/ChannelRouter';
-import { API_BASE_URL } from '../config';
 import { SecondarySidebarLayout } from './SecondarySidebarLayout';
 import { FriendsSidebar } from '../features/friends/FriendsSidebar';
 import { FriendsDashboard } from '../features/friends/FriendsDashboard';
 import { DirectMessagesSidebar } from '../features/dms/DirectMessagesSidebar';
 import { DirectMessageView } from '../features/dms/DirectMessageView';
+import { useServers } from '../features/servers/ServersContext';
 
 const ServerLayout = () => (
   <>
@@ -34,27 +33,11 @@ const MeLayout = () => (
 );
 
 export const AppLayout: React.FC = () => {
-  const [servers, setServers] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchServers = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`${API_BASE_URL}/api/servers`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        // FastAPI returns array directly (no success wrapper)
-        setServers(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        console.error('Failed to fetch servers', err);
-      }
-    };
-    fetchServers();
-  }, []);
+  const { servers, addServer } = useServers();
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-text-normal">
-      <ServerSidebar servers={servers} onServerCreated={(s) => setServers([...servers, s])} />
+      <ServerSidebar servers={servers} onServerCreated={addServer} />
 
       <Routes>
         <Route path="@me/*" element={<MeLayout />} />

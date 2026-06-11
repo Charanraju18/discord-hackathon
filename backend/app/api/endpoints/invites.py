@@ -55,7 +55,25 @@ async def join_invite(
         
     if current_user.id in server.members:
         return {"message": "Already a member", "serverId": str(server.id)}
-            
+
     server.members.append(current_user.id)
     await server.save()
+
+    # Notify the joining user in real-time so the sidebar updates instantly
+    from app.sockets import sio
+    from app.sockets.events import user_to_sid
+    user_sid = user_to_sid.get(str(current_user.id))
+    if user_sid:
+        await sio.emit("server_joined", {
+            "serverId": str(server.id),
+            "server": {
+                "id": str(server.id),
+                "name": server.name,
+                "icon": server.icon,
+                "memberCount": len(server.members),
+            }
+        }, to=user_sid)
+        # Also join the server notification room
+        await sio.enter_room(user_sid, f"server:{str(server.id)}")
+
     return {"message": "Successfully joined server", "serverId": str(server.id)}

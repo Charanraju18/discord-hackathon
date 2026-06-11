@@ -145,17 +145,19 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setUnreadDMs(prev => ({ ...prev, [convId]: (prev[convId] ?? 0) + 1 }));
     });
 
-    // Channel unread tracking
-    newSocket.on('new-message', (msg: any) => {
+    // Channel unread tracking via server-room broadcast.
+    // The backend emits `channel-unread` to `server:<id>` rooms (all server members),
+    // so this fires even when the user is in a different channel or not in the channel room.
+    // This is separate from `new-message` (which goes only to the active channel room).
+    newSocket.on('channel-unread', (msg: any) => {
       const channelId = msg.channelId;
       const serverId = msg.serverId;
-      const senderId = msg.sender?.id;
+      const senderId = msg.senderId;
       if (!channelId || senderId === user.id) return;
       if (channelId === activeChannelRef.current) return;
 
       setUnreadChannels(prev => ({ ...prev, [channelId]: (prev[channelId] ?? 0) + 1 }));
 
-      // Build channel→server map from the event payload
       if (serverId) {
         setChannelServerMap(prev =>
           prev[channelId] === serverId ? prev : { ...prev, [channelId]: serverId }

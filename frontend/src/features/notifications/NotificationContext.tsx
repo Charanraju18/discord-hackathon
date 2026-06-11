@@ -72,14 +72,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         createdAt: notif.data?.createdAt,
       };
       setNotifications(prev => {
-        // Deduplicate by id
         if (prev.find(n => n.id === newNotif.id)) return prev;
         return [newNotif, ...prev];
       });
     };
 
+    // When a friend request is accepted, remove the pending notification immediately
+    const handleRequestAccepted = (data: any) => {
+      if (data?.requestId) {
+        setNotifications(prev => prev.filter(n => n.id !== data.requestId));
+      }
+    };
+
     socket.on('notification-created', handleNotification);
-    return () => { socket.off('notification-created', handleNotification); };
+    socket.on('friend_request_accepted', handleRequestAccepted);
+    return () => {
+      socket.off('notification-created', handleNotification);
+      socket.off('friend_request_accepted', handleRequestAccepted);
+    };
   }, [socket]);
 
   const markAsRead = (id: string) => {

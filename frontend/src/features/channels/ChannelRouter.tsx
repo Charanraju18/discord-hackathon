@@ -76,7 +76,7 @@ export const ChannelRouter: React.FC = () => {
   }
 
   if (channelType === 'voice') {
-    return <VoiceChannel />;
+    return <VoiceChannel channelId={channelId!} />;
   }
 
   return <ChatArea />;

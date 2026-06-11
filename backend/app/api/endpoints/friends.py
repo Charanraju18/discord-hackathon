@@ -99,16 +99,47 @@ async def accept_request(
     req = await FriendRequest.get(ObjectId(request_id))
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
-        
+
     if req.receiverId != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
-        
+
+    sender_user = await User.get(req.senderId)
+
     # Create friendship
     friendship = Friendship(userOneId=req.senderId, userTwoId=req.receiverId)
     await friendship.insert()
-    
+
     # Delete request
     await req.delete()
+
+    # Emit real-time events to both users
+    from app.sockets import sio
+    from app.sockets.events import user_to_sid
+
+    # To the original sender: request was accepted, here's their new friend (the accepter)
+    sender_sid = user_to_sid.get(str(req.senderId))
+    if sender_sid:
+        await sio.emit("friend_request_accepted", {
+            "requestId": request_id,
+            "newFriend": {
+                "id": str(current_user.id),
+                "username": current_user.username,
+                "isOnline": current_user.isOnline
+            }
+        }, to=sender_sid)
+
+    # To the accepter: request removed, new friend added (the sender)
+    accepter_sid = user_to_sid.get(str(current_user.id))
+    if accepter_sid:
+        await sio.emit("friend_request_accepted", {
+            "requestId": request_id,
+            "newFriend": {
+                "id": str(sender_user.id) if sender_user else str(req.senderId),
+                "username": sender_user.username if sender_user else "Unknown",
+                "isOnline": sender_user.isOnline if sender_user else False
+            }
+        }, to=accepter_sid)
+
     return {"message": "Friend request accepted"}
 
 @router.post("/request/{request_id}/reject")

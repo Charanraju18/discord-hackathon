@@ -18,8 +18,9 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [newServerName, setNewServerName] = useState("");
-  const { unreadServers } = useSocket();
+  const { unreadServers, unreadDMs } = useSocket();
   const { serverId: activeServerId } = useParams<{ serverId?: string }>();
+  const totalDMUnread = Object.values(unreadDMs).reduce((sum, n) => sum + n, 0);
 
   const handleCreateServer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,10 +47,15 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
       <NavLink
         to="/channels/@me"
         className={({ isActive }) =>
-          `w-12 h-12 rounded-3xl flex items-center justify-center bg-background text-white transition-all duration-200 hover:rounded-2xl hover:bg-primary ${isActive ? "bg-primary rounded-2xl" : ""}`
+          `relative w-12 h-12 rounded-3xl flex items-center justify-center bg-background text-white transition-all duration-200 hover:rounded-2xl hover:bg-primary ${isActive ? "bg-primary rounded-2xl" : ""}`
         }
       >
         <img className="w-9 h-9" src={discordIcons} alt="Home" />
+        {totalDMUnread > 0 && (
+          <div className="absolute -top-1 -right-1 min-w-4 h-4 bg-[#f23f42] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1 border-2 border-server-bg">
+            {totalDMUnread > 99 ? "99+" : totalDMUnread}
+          </div>
+        )}
       </NavLink>
 
       <div className="w-8 h-0.5 bg-divider rounded my-1" />

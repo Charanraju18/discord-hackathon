@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getServerInitials } from '../../utils/serverInitials';
+import { useServers } from '../../features/servers/ServersContext';
 import { API_BASE_URL } from '../../config';
 
 interface ServerInviteCardProps {
@@ -11,15 +12,15 @@ interface ServerInviteCardProps {
 export const ServerInviteCard: React.FC<ServerInviteCardProps> = ({ inviteCode }) => {
   const [server, setServer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
   const navigate = useNavigate();
+  const { isJoinedServer, addServer } = useServers();
 
   useEffect(() => {
     const fetchInvite = async () => {
       try {
         const res = await axios.get(`${API_BASE_URL}/api/invites/${inviteCode}`);
-        setServer(res.data.server);
+        setServer(res.data.server ? { ...res.data.server, id: res.data.invite?.serverId } : null);
       } catch {
         setServer(null);
       } finally {
@@ -29,7 +30,13 @@ export const ServerInviteCard: React.FC<ServerInviteCardProps> = ({ inviteCode }
     fetchInvite();
   }, [inviteCode]);
 
+  const alreadyJoined = server?.id ? isJoinedServer(server.id) : false;
+
   const handleJoin = async () => {
+    if (alreadyJoined && server?.id) {
+      navigate(`/channels/${server.id}`);
+      return;
+    }
     setJoining(true);
     try {
       const token = localStorage.getItem('token');
@@ -38,8 +45,9 @@ export const ServerInviteCard: React.FC<ServerInviteCardProps> = ({ inviteCode }
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setJoined(true);
       if (res.data.serverId) {
+        // Add to servers context immediately (socket event also does this, belt+suspenders)
+        if (server) addServer({ ...server, id: res.data.serverId });
         navigate(`/channels/${res.data.serverId}`);
       }
     } catch (err) {
@@ -51,7 +59,7 @@ export const ServerInviteCard: React.FC<ServerInviteCardProps> = ({ inviteCode }
 
   if (loading) {
     return (
-      <div className="mt-2 bg-[#2b2d31] border border-divider rounded-lg p-3 w-64 animate-pulse">
+      <div className="mt-2 bg-channel-bg border border-divider rounded-lg p-3 w-64 animate-pulse">
         <div className="h-4 bg-white/10 rounded w-3/4 mb-2" />
         <div className="h-3 bg-white/10 rounded w-1/2" />
       </div>
@@ -60,21 +68,21 @@ export const ServerInviteCard: React.FC<ServerInviteCardProps> = ({ inviteCode }
 
   if (!server) {
     return (
-      <div className="mt-2 bg-[#2b2d31] border border-divider rounded-lg p-3 w-64">
+      <div className="mt-2 bg-channel-bg border border-divider rounded-lg p-3 w-64">
         <p className="text-text-muted text-sm">Invalid or expired invite.</p>
       </div>
     );
   }
 
   return (
-    <div className="mt-2 bg-[#2b2d31] border border-divider rounded-lg overflow-hidden w-72">
+    <div className="mt-2 bg-channel-bg border border-divider rounded-lg overflow-hidden w-72">
       {/* Banner */}
-      <div className="h-[60px] bg-gradient-to-r from-[#1e1f22] to-[#313338]" />
+      <div className="h-15 bg-linear-to-r from-server-bg to-background" />
 
       {/* Body */}
       <div className="px-4 pb-4 -mt-7">
         {/* Server Icon */}
-        <div className="w-14 h-14 rounded-2xl bg-[#111214] border-4 border-[#2b2d31] flex items-center justify-center mb-2">
+        <div className="w-14 h-14 rounded-2xl bg-[#111214] border-4 border-channel-bg flex items-center justify-center mb-2">
           {server.icon ? (
             <img src={server.icon} alt={server.name} className="w-full h-full rounded-2xl object-cover" />
           ) : (
@@ -100,14 +108,14 @@ export const ServerInviteCard: React.FC<ServerInviteCardProps> = ({ inviteCode }
 
         <button
           onClick={handleJoin}
-          disabled={joined || joining}
+          disabled={joining}
           className={`w-full py-1.5 rounded text-sm font-semibold transition-colors ${
-            joined
-              ? 'bg-[#23a559]/20 text-[#23a559] cursor-default'
+            alreadyJoined
+              ? 'bg-primary hover:bg-primary-hover text-white'
               : 'bg-[#23a559] hover:bg-[#1a9147] text-white disabled:opacity-60'
           }`}
         >
-          {joined ? 'Joined!' : joining ? 'Joining...' : 'Join Server'}
+          {joining ? 'Joining...' : alreadyJoined ? 'Go To Server' : 'Join Server'}
         </button>
       </div>
     </div>

@@ -22,21 +22,30 @@ async def setup(sid, user_id):
     if not user_id:
         return
     print(f"User setup: {user_id} with sid {sid}")
-    
+
     # Store mapping
     sid_to_user[sid] = user_id
     user_to_sid[user_id] = sid
-    
+
     # Update online status
     try:
         user = await User.get(ObjectId(user_id))
         if user:
             user.isOnline = True
             await user.save()
-            # Broadcast to friends or globally that user is online
             await sio.emit("presence", {"userId": user_id, "isOnline": True})
     except Exception as e:
         print(f"Setup error: {e}")
+
+    # Join server-level rooms so user receives channel-unread notifications
+    # for all servers they're a member of (not just the currently active channel)
+    try:
+        from app.models.server import Server as ServerModel
+        user_servers = await ServerModel.find({"members": ObjectId(user_id)}).to_list()
+        for srv in user_servers:
+            await sio.enter_room(sid, f"server:{str(srv.id)}")
+    except Exception as e:
+        print(f"Setup server rooms error: {e}")
 
 @sio.on("disconnect")
 async def disconnect(sid):
@@ -289,6 +298,16 @@ async def handle_new_message(sid, data):
         }
 
         await sio.emit("new-message", payload, room=str(channel_id))
+
+        # Emit unread notification to the server-level room so users on
+        # other channels (but same server) can update their unread badges.
+        if server_id:
+            await sio.emit("channel-unread", {
+                "channelId": str(channel_id),
+                "serverId": server_id,
+                "senderId": user_id,
+            }, room=f"server:{server_id}")
+
     except Exception as e:
         print(f"Error handling new message: {e}")
 
