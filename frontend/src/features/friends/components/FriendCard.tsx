@@ -31,9 +31,8 @@ export const FriendCard: React.FC<FriendCardProps> = ({
           {user.username.charAt(0).toUpperCase()}
           {type === "friend" && (
             <div
-              className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-[3px] border-[#313338] ${
-                user.status === "online" ? "bg-[#23a559]" : "bg-[#80848e]"
-              }`}
+              className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-[3px] border-[#313338] ${user.status === "online" ? "bg-[#23a559]" : "bg-[#80848e]"
+                }`}
             />
           )}
         </div>
@@ -59,7 +58,7 @@ export const FriendCard: React.FC<FriendCardProps> = ({
               className="w-9 h-9 rounded-full bg-[#2b2d31] flex items-center justify-center text-text-muted hover:text-white transition-colors"
               title="Message"
             >
-              <MessageSquare size={18} />
+              <MessageSquare size={18} className="cursor-pointer" />
             </button>
             <button
               onClick={() => onRemove && onRemove(user._id)}
@@ -67,7 +66,7 @@ export const FriendCard: React.FC<FriendCardProps> = ({
               className="w-9 h-9 rounded-full bg-[#2b2d31] flex items-center justify-center text-text-muted hover:text-[#f23f42] transition-colors"
               title="Remove Friend"
             >
-              <Trash2 size={18} />
+              <Trash2 size={18} className="cursor-pointer" />
             </button>
           </>
         )}

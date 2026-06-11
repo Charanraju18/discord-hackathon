@@ -42,7 +42,7 @@ export const Register: React.FC = () => {
   return (
     <div className="relative flex h-screen w-full items-center justify-center bg-[#5865F2]">
       <img src={loginbg} alt="Background" className="absolute inset-0 w-full h-full object-cover" />
-      
+
       {/* Top Left Logo */}
       <div className="absolute top-8 left-8 flex items-center space-x-2 z-10">
         <svg className="w-8 h-8 text-white" viewBox="0 0 127.14 96.36" fill="currentColor">
@@ -99,6 +99,12 @@ export const Register: React.FC = () => {
               required
             />
           </div>
+          <div className='mt-2 text-[14px] text-[#949ba4]'>
+            By clicking “Create Account,” you agree to Discord's
+            <a className="anchor_edefb8 anchorUnderlineOnHover_edefb8 text-[#00a8fc]" href="//discord.com/terms" target="_blank"> Terms of Service </a>
+            and have read the
+            <a className="anchor_edefb8 anchorUnderlineOnHover_edefb8 text-[#00a8fc]" href="//discord.com/privacy" target="_blank"> Privacy Policy </a>
+          </div>
           <button
             type="submit"
             disabled={isLoading}
@@ -111,10 +117,9 @@ export const Register: React.FC = () => {
             )}
           </button>
         </form>
-
         <div className="mt-4 text-[14px] text-[#949ba4]">
           <Link to="/login" className="text-[#00a8fc] hover:underline font-medium">
-            Already have an account?
+            Already have an account? Login
           </Link>
         </div>
       </div>
