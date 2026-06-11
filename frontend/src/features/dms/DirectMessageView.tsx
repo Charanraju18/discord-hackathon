@@ -22,7 +22,7 @@ export const DirectMessageView: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { socket, onlineUsers, presenceOverrides } = useSocket();
+  const { socket, onlineUsers, presenceOverrides, markDMRead, setActiveDMConversation } = useSocket();
   const { user } = useAuth();
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -31,6 +31,13 @@ export const DirectMessageView: React.FC = () => {
   };
 
   useEffect(() => { scrollToBottom(); }, [messages, typingUsers, pendingFiles]);
+
+  // Mark this conversation as read when opened; clear on leave
+  useEffect(() => {
+    if (!conversationId) return;
+    setActiveDMConversation(conversationId);
+    return () => { setActiveDMConversation(null); };
+  }, [conversationId]);
 
   useEffect(() => {
     const fetchData = async () => {

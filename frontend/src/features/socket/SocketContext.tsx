@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../auth/AuthContext';
 import { API_BASE_URL } from '../../config';
@@ -8,6 +8,10 @@ interface SocketContextType {
   isConnected: boolean;
   onlineUsers: string[];
   presenceOverrides: Record<string, boolean>;
+  // Unread DM tracking
+  unreadDMs: Record<string, number>;
+  markDMRead: (conversationId: string) => void;
+  setActiveDMConversation: (id: string | null) => void;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -18,6 +22,30 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isConnected, setIsConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [presenceOverrides, setPresenceOverrides] = useState<Record<string, boolean>>({});
+  const [unreadDMs, setUnreadDMs] = useState<Record<string, number>>({});
+  const activeDMConvRef = useRef<string | null>(null);
+
+  const markDMRead = (conversationId: string) => {
+    activeDMConvRef.current = conversationId;
+    setUnreadDMs(prev => {
+      if (!prev[conversationId]) return prev;
+      const next = { ...prev };
+      delete next[conversationId];
+      return next;
+    });
+  };
+
+  const setActiveDMConversation = (id: string | null) => {
+    activeDMConvRef.current = id;
+    if (id) {
+      setUnreadDMs(prev => {
+        if (!prev[id]) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -28,11 +56,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     newSocket.on('connect', () => {
       setIsConnected(true);
-      // Register this socket session with the backend so it can map sid → userId
       newSocket.emit('setup', user.id);
     });
 
-    // Backend emits `presence` with { userId, isOnline }
     newSocket.on('presence', ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
       if (isOnline) {
         setOnlineUsers(prev => prev.includes(userId) ? prev : [...prev, userId]);
@@ -42,9 +68,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setPresenceOverrides(prev => ({ ...prev, [userId]: isOnline }));
     });
 
-    // Legacy full sync (kept for compatibility)
     newSocket.on('online-users', (users: string[]) => {
       setOnlineUsers(users);
+    });
+
+    // Track unread DMs — increment only when the conversation isn't currently open
+    newSocket.on('new_direct_message', (msg: any) => {
+      const convId = msg.conversationId;
+      const senderId = msg.sender?.id;
+      // Don't count own messages or messages in the active conversation
+      if (!convId || senderId === user.id) return;
+      if (convId === activeDMConvRef.current) return;
+      setUnreadDMs(prev => ({ ...prev, [convId]: (prev[convId] ?? 0) + 1 }));
     });
 
     newSocket.on('disconnect', () => {
@@ -58,7 +93,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [user]);
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected, onlineUsers, presenceOverrides }}>
+    <SocketContext.Provider value={{
+      socket, isConnected, onlineUsers, presenceOverrides,
+      unreadDMs, markDMRead, setActiveDMConversation
+    }}>
       {children}
     </SocketContext.Provider>
   );

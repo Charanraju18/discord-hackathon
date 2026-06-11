@@ -44,6 +44,22 @@ async def send_request(
         
     new_req = FriendRequest(senderId=current_user.id, receiverId=receiver_id)
     await new_req.insert()
+
+    # Notify receiver in real-time
+    from app.sockets import sio
+    from app.sockets.events import user_to_sid
+    receiver_sid = user_to_sid.get(str(receiver_id))
+    if receiver_sid:
+        await sio.emit("notification-created", {
+            "type": "friend_request",
+            "id": str(new_req.id),
+            "data": {
+                "id": str(new_req.id),
+                "sender": {"id": str(current_user.id), "username": current_user.username},
+                "createdAt": str(new_req.createdAt)
+            }
+        }, to=receiver_sid)
+
     return {"message": "Friend request sent"}
 
 @router.get("/requests")
