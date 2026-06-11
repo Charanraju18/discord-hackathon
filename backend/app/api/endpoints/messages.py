@@ -30,7 +30,6 @@ async def get_messages(
             results.append({
                 "id": str(m.id),
                 "channelId": str(m.channelId),
-                "serverId": str(m.serverId),
                 "sender": sender.model_dump(),
                 "content": m.content,
                 "isEdited": m.isEdited,
@@ -69,7 +68,6 @@ async def edit_message(
     payload = {
         "id": str(msg.id),
         "channelId": str(msg.channelId),
-        "serverId": str(msg.serverId),
         "sender": sender.model_dump() if sender else None,
         "content": msg.content,
         "isEdited": msg.isEdited,
@@ -106,7 +104,6 @@ async def delete_message(
     payload = {
         "id": str(msg.id),
         "channelId": str(msg.channelId),
-        "serverId": str(msg.serverId),
         "sender": sender.model_dump() if sender else None,
         "content": "Message deleted",
         "isEdited": msg.isEdited,

@@ -20,7 +20,7 @@ def _friend_dict(user) -> dict:
         "username": user.username,
         "email": user.email,
         "isOnline": user.isOnline,
-        "lastSeen": user.lastSeen
+        "lastSeen": str(user.lastSeen) if user.lastSeen else None
     }
 
 def _conv_response(conv, participants: list, current_user_id) -> dict:
@@ -30,8 +30,8 @@ def _conv_response(conv, participants: list, current_user_id) -> dict:
         "participants": [_friend_dict(p) for p in participants],
         "friend": _friend_dict(friend) if friend else None,
         "lastMessageId": str(conv.lastMessageId) if conv.lastMessageId else None,
-        "createdAt": conv.createdAt,
-        "updatedAt": conv.updatedAt
+        "createdAt": str(conv.createdAt) if conv.createdAt else None,
+        "updatedAt": str(conv.updatedAt) if conv.updatedAt else None
     }
 
 @router.post("/start")
@@ -89,12 +89,12 @@ async def get_messages(
                 "sender": _friend_dict(sender),
                 "content": m.content,
                 "isEdited": m.isEdited,
-                "editedAt": m.editedAt,
+                "editedAt": str(m.editedAt) if m.editedAt else None,
                 "deleted": m.deleted,
-                "deletedAt": m.deletedAt,
-                "attachments": m.attachments,
-                "createdAt": m.createdAt,
-                "updatedAt": m.updatedAt
+                "deletedAt": str(m.deletedAt) if m.deletedAt else None,
+                "attachments": [a.model_dump() for a in m.attachments],
+                "createdAt": str(m.createdAt) if m.createdAt else None,
+                "updatedAt": str(m.updatedAt) if m.updatedAt else None
             })
     return results
 

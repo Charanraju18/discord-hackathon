@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, NavLink } from 'react-router-dom';
 import axios from 'axios';
-import { Hash, Plus, UserPlus } from 'lucide-react';
+import { Hash, Plus, UserPlus, Volume2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useVoice } from '../rtc/hooks/useWebRTC';
 import { UserInviteModal } from '../invitations/UserInviteModal';
 import { API_BASE_URL } from '../../config';
 
@@ -13,7 +14,9 @@ export const ChannelSidebar: React.FC = () => {
   const [showChannelModal, setShowChannelModal] = useState(false);
   const [showUserInviteModal, setShowUserInviteModal] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+  const [newChannelType, setNewChannelType] = useState('text');
   const { user } = useAuth();
+  const { joinVoiceChannel, currentVoiceChannelId, participants } = useVoice();
 
   useEffect(() => {
     const fetchChannels = async () => {
@@ -53,7 +56,7 @@ export const ChannelSidebar: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const res = await axios.post(`${API_BASE_URL}/api/channels`,
-        { name: newChannelName, serverId },
+        { name: newChannelName, serverId, type: newChannelType },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       // FastAPI returns channel object directly
@@ -61,6 +64,7 @@ export const ChannelSidebar: React.FC = () => {
         setChannels([...channels, res.data]);
         setShowChannelModal(false);
         setNewChannelName('');
+        setNewChannelType('text');
       }
     } catch (err) {
       console.error('Failed to create channel', err);
@@ -85,14 +89,14 @@ export const ChannelSidebar: React.FC = () => {
       <div className="flex-1 overflow-y-auto py-3 px-2 custom-scrollbar">
         <div
           className="flex items-center justify-between text-text-muted hover:text-text-normal mb-1 px-2 group cursor-pointer"
-          onClick={() => setShowChannelModal(true)}
+          onClick={() => { setShowChannelModal(true); setNewChannelType('text'); }}
         >
           <span className="text-xs font-bold uppercase tracking-wider">Text Channels</span>
           <Plus size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        <div className="space-y-[2px]">
-          {channels.map((channel) => (
+        <div className="space-y-[2px] mb-4">
+          {channels.filter(c => c.type === 'text' || !c.type).map((channel) => (
             <NavLink
               key={channel.id}
               to={`/channels/${serverId}/${channel.id}`}
@@ -103,6 +107,47 @@ export const ChannelSidebar: React.FC = () => {
               <Hash size={20} className="mr-1.5 text-text-muted" />
               <span className="font-medium truncate">{channel.name}</span>
             </NavLink>
+          ))}
+        </div>
+
+        <div
+          className="flex items-center justify-between text-text-muted hover:text-text-normal mb-1 px-2 group cursor-pointer"
+          onClick={() => { setShowChannelModal(true); setNewChannelType('voice'); }}
+        >
+          <span className="text-xs font-bold uppercase tracking-wider">Voice Channels</span>
+          <Plus size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+
+        <div className="space-y-[2px]">
+          {channels.filter(c => c.type === 'voice').map((channel) => (
+            <div key={channel.id}>
+              <NavLink
+                to={`/channels/${serverId}/${channel.id}`}
+                className={({ isActive }) =>
+                  `flex items-center px-2 py-1.5 rounded text-text-muted hover:bg-white/5 hover:text-interactive-hover transition-colors ${isActive || currentVoiceChannelId === channel.id ? 'bg-white/10 text-interactive-active' : ''}`
+                }
+              >
+                <Volume2 size={20} className="mr-1.5 text-text-muted" />
+                <span className="font-medium truncate">{channel.name}</span>
+              </NavLink>
+              {/* If we are connected to this channel, show participants here optionally */}
+              {currentVoiceChannelId === channel.id && Object.keys(participants).length > 0 && (
+                <div className="ml-6 mt-1 space-y-1">
+                  {/* Local User */}
+                  <div className="flex items-center text-text-muted text-sm px-2 py-1 hover:bg-white/5 rounded cursor-pointer">
+                    <img src={`https://ui-avatars.com/api/?name=${user?.username}&background=random`} alt="avatar" className="w-6 h-6 rounded-full mr-2" />
+                    <span className="truncate">{user?.username}</span>
+                  </div>
+                  {/* Remote Users */}
+                  {Object.entries(participants).map(([userId, state]) => (
+                    <div key={userId} className="flex items-center text-text-muted text-sm px-2 py-1 hover:bg-white/5 rounded cursor-pointer">
+                      <img src={`https://ui-avatars.com/api/?name=${state.username || 'User'}&background=random`} alt="avatar" className="w-6 h-6 rounded-full mr-2" />
+                      <span className="truncate">{state.username || 'User'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>
@@ -116,18 +161,28 @@ export const ChannelSidebar: React.FC = () => {
               <button onClick={() => setShowChannelModal(false)} className="text-text-muted hover:text-white">✕</button>
             </div>
             <form onSubmit={handleCreateChannel}>
-              <label className="block text-xs font-bold text-text-muted uppercase mb-2">Channel Name</label>
-              <div className="relative mb-6">
-                <Hash size={16} className="absolute left-2.5 top-3 text-text-muted" />
-                <input
-                  type="text"
-                  value={newChannelName}
-                  onChange={(e) => setNewChannelName(e.target.value)}
-                  className="w-full bg-server-bg text-white py-2.5 pr-2.5 pl-8 rounded border border-transparent focus:outline-none"
-                  placeholder="new-channel"
-                  required
-                />
-              </div>
+                <label className="block text-xs font-bold text-text-muted uppercase mb-2">Channel Type</label>
+                <div className="flex gap-2 mb-4">
+                  <button type="button" onClick={() => setNewChannelType('text')} className={`flex-1 py-2 rounded flex justify-center items-center gap-2 ${newChannelType === 'text' ? 'bg-[#3f4147] text-white' : 'bg-channel-bg text-text-muted hover:bg-white/5'}`}>
+                    <Hash size={18} /> Text
+                  </button>
+                  <button type="button" onClick={() => setNewChannelType('voice')} className={`flex-1 py-2 rounded flex justify-center items-center gap-2 ${newChannelType === 'voice' ? 'bg-[#3f4147] text-white' : 'bg-channel-bg text-text-muted hover:bg-white/5'}`}>
+                    <Volume2 size={18} /> Voice
+                  </button>
+                </div>
+                
+                <label className="block text-xs font-bold text-text-muted uppercase mb-2">Channel Name</label>
+                <div className="relative mb-6">
+                  {newChannelType === 'text' ? <Hash size={16} className="absolute left-2.5 top-3 text-text-muted" /> : <Volume2 size={16} className="absolute left-2.5 top-3 text-text-muted" />}
+                  <input
+                    type="text"
+                    value={newChannelName}
+                    onChange={(e) => setNewChannelName(e.target.value)}
+                    className="w-full bg-server-bg text-white py-2.5 pr-2.5 pl-8 rounded border border-transparent focus:outline-none focus:border-blue-500 transition-colors"
+                    placeholder="new-channel"
+                    required
+                  />
+                </div>
               <div className="flex justify-between items-center bg-channel-bg -mx-6 -mb-6 p-4 rounded-b-lg">
                 <button type="button" onClick={() => setShowChannelModal(false)} className="text-text-normal hover:underline text-sm">Cancel</button>
                 <button type="submit" className="bg-primary text-white px-6 py-2 rounded font-medium hover:bg-primary-hover transition-colors">Create Channel</button>
