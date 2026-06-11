@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import { AtSign, PlusCircle, Send, Edit2, Trash2, File, X, Loader2 } from 'lucide-react';
+import { AtSign, PlusCircle, Send, Edit2, Trash2, File, X, Loader2, Smile, SmilePlus } from 'lucide-react';
 import { useSocket } from '../socket/SocketContext';
 import { useAuth } from '../auth/AuthContext';
 import { AttachmentRenderer } from '../../components/messages/AttachmentRenderer';
+import { EmojiPickerPopup } from '../../components/messages/EmojiPickerPopup';
+import { ReactionBadge } from '../../components/messages/ReactionBadge';
 import { ServerInviteCard, extractInviteCode } from '../../components/messages/ServerInviteCard';
 import { DMProfilePanel } from './DMProfilePanel';
 import { API_BASE_URL } from '../../config';
@@ -20,6 +22,9 @@ export const DirectMessageView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { socket, onlineUsers, presenceOverrides, markDMRead, setActiveDMConversation } = useSocket();
@@ -105,11 +110,18 @@ export const DirectMessageView: React.FC = () => {
         setMessages(prev => prev.filter(m => m.id !== id));
       };
 
+      const handleReactionUpdated = (payload: any) => {
+        if (payload.channelId === conversationId) { // The backend payload uses channelId for DMs too due to shared code logic, actually wait, check what backend sends for channelId in DMs. The backend sends conversationId as channelId if type is dm. So payload.channelId is conversationId.
+          setMessages(prev => prev.map(m => m.id === payload.messageId ? { ...m, reactions: payload.reactions } : m));
+        }
+      };
+
       socket.on('new_direct_message', handleReceiveMessage);
       socket.on('dm:typing', handleUserTyping);
       socket.on('dm:stop-typing', handleUserStopTyping);
       socket.on('update_direct_message', handleMessageUpdated);
       socket.on('delete_direct_message', handleMessageDeleted);
+      socket.on('reaction_updated', handleReactionUpdated);
 
       return () => {
         socket.off('connect', joinConv);
@@ -118,6 +130,7 @@ export const DirectMessageView: React.FC = () => {
         socket.off('dm:stop-typing', handleUserStopTyping);
         socket.off('update_direct_message', handleMessageUpdated);
         socket.off('delete_direct_message', handleMessageDeleted);
+        socket.off('reaction_updated', handleReactionUpdated);
       };
     }
   }, [conversationId, socket, user?.username]);
@@ -146,6 +159,18 @@ export const DirectMessageView: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
     } catch (err) { console.error('Failed to delete message', err); }
+  };
+
+  const toggleReaction = (messageId: string, emoji: string, currentReactions: any[] = []) => {
+    if (!socket || !user) return;
+    const reaction = currentReactions.find(r => r.emoji === emoji);
+    const hasReacted = reaction?.users?.some((u: any) => (typeof u === 'string' ? u : u.id) === user?.id);
+    
+    if (hasReacted) {
+      socket.emit('remove_reaction', { messageId, emoji, type: 'dm' });
+    } else {
+      socket.emit('add_reaction', { messageId, emoji, type: 'dm' });
+    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -186,6 +211,7 @@ export const DirectMessageView: React.FC = () => {
       sender: { id: user.id, username: user.username, email: user.email, isOnline: true },
       content: currentMessage,
       attachments: uploadedAttachments,
+      reactions: [],
       isEdited: false,
       deleted: false,
       createdAt: new Date().toISOString(),
@@ -313,22 +339,59 @@ export const DirectMessageView: React.FC = () => {
                       </div>
                     )}
 
-                    {isOwn && !msg.deleted && editingMessageId !== msg.id && (
-                      <div className="absolute right-0 -top-4 opacity-0 group-hover:opacity-100 bg-background border border-divider shadow-sm rounded flex items-center overflow-hidden transition-opacity">
+                    {/* Hover Actions Toolbar */}
+                    {!msg.deleted && editingMessageId !== msg.id && (
+                      <div className={`absolute right-0 -top-4 ${reactionPickerMessageId === msg.id ? 'opacity-100 z-50' : 'opacity-0 group-hover:opacity-100'} bg-background border border-divider shadow-sm rounded flex items-center transition-opacity`}>
                         <button
-                          className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors"
-                          onClick={() => { setEditingMessageId(msg.id); setEditContent(msg.content); }}
-                          title="Edit"
+                          className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors relative"
+                          onClick={() => setReactionPickerMessageId(reactionPickerMessageId === msg.id ? null : msg.id)}
+                          title="Add Reaction"
                         >
-                          <Edit2 size={16} />
+                          <SmilePlus size={16} />
+                          {reactionPickerMessageId === msg.id && (
+                            <EmojiPickerPopup
+                              position="top-right"
+                              onClose={() => setReactionPickerMessageId(null)}
+                              onEmojiSelect={(emoji) => {
+                                socket?.emit('add_reaction', { messageId: msg.id, emoji: emoji.emoji, type: 'dm' });
+                              }}
+                            />
+                          )}
                         </button>
-                        <button
-                          className="p-1.5 text-red-500 hover:text-red-400 hover:bg-white/10 transition-colors"
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {isOwn && (
+                          <>
+                            <button
+                              className="p-1.5 text-text-muted hover:text-white hover:bg-white/10 transition-colors"
+                              onClick={() => { setEditingMessageId(msg.id); setEditContent(msg.content); }}
+                              title="Edit"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              className="p-1.5 text-red-500 hover:text-red-400 hover:bg-white/10 transition-colors"
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Reactions */}
+                    {msg.reactions && msg.reactions.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {msg.reactions.map((r: any) => (
+                          <ReactionBadge
+                            key={r.emoji}
+                            emoji={r.emoji}
+                            count={r.users.length}
+                            hasReacted={r.users.some((u: any) => (typeof u === 'string' ? u : u.id) === user?.id)}
+                            users={r.users}
+                            onClick={() => toggleReaction(msg.id, r.emoji, msg.reactions)}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>
@@ -412,6 +475,20 @@ export const DirectMessageView: React.FC = () => {
               }
             }}
           />
+          <button
+            type="button"
+            className="text-interactive-normal hover:text-interactive-hover ml-4 shrink-0 relative"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          >
+            <Smile size={24} />
+            {showEmojiPicker && (
+              <EmojiPickerPopup
+                position="top-right"
+                onClose={() => setShowEmojiPicker(false)}
+                onEmojiSelect={(emoji) => setMessage(prev => prev + emoji.emoji)}
+              />
+            )}
+          </button>
           <button
             type="submit"
             tabIndex={-1}

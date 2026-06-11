@@ -283,6 +283,7 @@ async def handle_new_message(sid, data):
             "deleted": new_msg.deleted,
             "deletedAt": str(new_msg.deletedAt) if new_msg.deletedAt else None,
             "attachments": [{"url": a.url, "publicId": a.publicId, "fileName": a.fileName, "fileSize": a.fileSize, "mimeType": a.mimeType, "resourceType": a.resourceType, "uploadedAt": str(a.uploadedAt) if a.uploadedAt else None} for a in new_msg.attachments],
+            "reactions": [{"emoji": r.emoji, "users": r.users} for r in getattr(new_msg, 'reactions', [])],
             "createdAt": str(new_msg.createdAt),
             "updatedAt": str(new_msg.updatedAt)
         }
@@ -290,3 +291,105 @@ async def handle_new_message(sid, data):
         await sio.emit("new-message", payload, room=str(channel_id))
     except Exception as e:
         print(f"Error handling new message: {e}")
+
+from app.models.direct_message import DirectMessage
+from app.models.direct_conversation import DirectConversation
+from app.models.message import Reaction
+
+@sio.on("add_reaction")
+async def handle_add_reaction(sid, data):
+    user_id = sid_to_user.get(sid)
+    if not user_id: return
+    
+    msg_id = data.get("messageId")
+    emoji = data.get("emoji")
+    msg_type = data.get("type", "channel")
+    
+    if not msg_id or not emoji: return
+    
+    try:
+        if msg_type == "channel":
+            msg = await Message.get(ObjectId(msg_id))
+        else:
+            msg = await DirectMessage.get(ObjectId(msg_id))
+            
+        if not msg: return
+        
+        reaction = next((r for r in msg.reactions if r.emoji == emoji), None)
+        if reaction:
+            if user_id not in reaction.users:
+                reaction.users.append(user_id)
+        else:
+            msg.reactions.append(Reaction(emoji=emoji, users=[user_id]))
+            
+        await msg.save()
+        
+        from app.api.endpoints.messages import _resolve_reactions
+        resolved_reactions = await _resolve_reactions(msg.reactions)
+        
+        payload = {
+            "messageId": str(msg.id),
+            "channelId": str(msg.channelId) if msg_type == "channel" else str(msg.conversationId),
+            "reactions": resolved_reactions,
+            "type": msg_type
+        }
+        
+        if msg_type == "channel":
+            await sio.emit("reaction_updated", payload, room=str(msg.channelId))
+        else:
+            conv = await DirectConversation.get(msg.conversationId)
+            if conv:
+                for pid in conv.participants:
+                    target_sid = user_to_sid.get(str(pid))
+                    if target_sid:
+                        await sio.emit("reaction_updated", payload, to=target_sid)
+    except Exception as e:
+        print(f"Error adding reaction: {e}")
+
+@sio.on("remove_reaction")
+async def handle_remove_reaction(sid, data):
+    user_id = sid_to_user.get(sid)
+    if not user_id: return
+    
+    msg_id = data.get("messageId")
+    emoji = data.get("emoji")
+    msg_type = data.get("type", "channel")
+    
+    if not msg_id or not emoji: return
+    
+    try:
+        if msg_type == "channel":
+            msg = await Message.get(ObjectId(msg_id))
+        else:
+            msg = await DirectMessage.get(ObjectId(msg_id))
+            
+        if not msg: return
+        
+        reaction = next((r for r in msg.reactions if r.emoji == emoji), None)
+        if reaction and user_id in reaction.users:
+            reaction.users.remove(user_id)
+            if not reaction.users:
+                msg.reactions.remove(reaction)
+            await msg.save()
+            
+            from app.api.endpoints.messages import _resolve_reactions
+            resolved_reactions = await _resolve_reactions(msg.reactions)
+            
+            payload = {
+                "messageId": str(msg.id),
+                "channelId": str(msg.channelId) if msg_type == "channel" else str(msg.conversationId),
+                "reactions": resolved_reactions,
+                "type": msg_type
+            }
+            
+            if msg_type == "channel":
+                await sio.emit("reaction_updated", payload, room=str(msg.channelId))
+            else:
+                conv = await DirectConversation.get(msg.conversationId)
+                if conv:
+                    for pid in conv.participants:
+                        target_sid = user_to_sid.get(str(pid))
+                        if target_sid:
+                            await sio.emit("reaction_updated", payload, to=target_sid)
+    except Exception as e:
+        print(f"Error removing reaction: {e}")

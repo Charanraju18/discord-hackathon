@@ -19,7 +19,25 @@ def _user_dict(u) -> dict:
 def _attachment_dict(a) -> dict:
     return {"url": a.url, "publicId": a.publicId, "fileName": a.fileName, "fileSize": a.fileSize, "mimeType": a.mimeType, "resourceType": a.resourceType, "uploadedAt": str(a.uploadedAt) if a.uploadedAt else None}
 
-def _msg_dict(m, sender) -> dict:
+async def _resolve_reactions(reactions):
+    if not reactions:
+        return []
+    
+    user_ids = set()
+    for r in reactions:
+        user_ids.update(r.users)
+        
+    users = await User.find({"_id": {"$in": [ObjectId(uid) for uid in user_ids]}}).to_list()
+    user_map = {str(u.id): u.username for u in users}
+    
+    resolved = []
+    for r in reactions:
+        resolved_users = [{"id": uid, "username": user_map.get(uid, "Unknown User")} for uid in r.users]
+        resolved.append({"emoji": r.emoji, "users": resolved_users})
+    return resolved
+
+async def _msg_dict(m, sender) -> dict:
+    resolved_reactions = await _resolve_reactions(getattr(m, 'reactions', []))
     return {
         "id": str(m.id),
         "channelId": str(m.channelId),
@@ -31,6 +49,7 @@ def _msg_dict(m, sender) -> dict:
         "deleted": m.deleted,
         "deletedAt": str(m.deletedAt) if m.deletedAt else None,
         "attachments": [_attachment_dict(a) for a in m.attachments],
+        "reactions": resolved_reactions,
         "createdAt": str(m.createdAt),
         "updatedAt": str(m.updatedAt)
     }
@@ -49,7 +68,8 @@ async def get_messages(
     results = []
     for m in messages:
         sender = await User.get(m.senderId)
-        results.append(_msg_dict(m, sender))
+        msg_dict = await _msg_dict(m, sender)
+        results.append(msg_dict)
     return results
 
 @router.put("/{message_id}")
@@ -77,7 +97,7 @@ async def edit_message(
     }))
     
     sender = await User.get(current_user.id)
-    payload = _msg_dict(msg, sender)
+    payload = await _msg_dict(msg, sender)
     await sio.emit("message-updated", payload, room=str(msg.channelId))
     return payload
 
