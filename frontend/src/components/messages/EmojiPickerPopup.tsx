@@ -10,7 +10,7 @@ interface EmojiPickerPopupProps {
 export const EmojiPickerPopup: React.FC<EmojiPickerPopupProps> = ({
   onEmojiSelect,
   onClose,
-  position = 'top-right'
+  position = 'top-left'
 }) => {
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -31,22 +31,22 @@ export const EmojiPickerPopup: React.FC<EmojiPickerPopupProps> = ({
   let positionClasses = '';
   switch (position) {
     case 'top-right':
-      positionClasses = 'bottom-full right-0 mb-2';
+      positionClasses = 'bottom-[calc(100%+8px)] right-0';
       break;
     case 'top-left':
-      positionClasses = 'bottom-full left-0 mb-2';
+      positionClasses = 'bottom-[calc(100%+8px)] left-0';
       break;
     case 'bottom-right':
-      positionClasses = 'top-full right-0 mt-2';
+      positionClasses = 'top-[calc(100%+8px)] right-0';
       break;
     case 'bottom-left':
-      positionClasses = 'top-full left-0 mt-2';
+      positionClasses = 'top-[calc(100%+8px)] left-0';
       break;
   }
 
   return (
-    <div 
-      ref={pickerRef} 
+    <div
+      ref={pickerRef}
       className={`absolute z-50 ${positionClasses} shadow-lg rounded-lg overflow-hidden`}
       style={{ width: '350px', height: '450px' }}
       onClick={(e) => e.stopPropagation()}

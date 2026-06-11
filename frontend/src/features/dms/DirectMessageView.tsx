@@ -452,20 +452,6 @@ export const DirectMessageView: React.FC = () => {
           >
             <PlusCircle size={24} />
           </button>
-          <button
-            type="button"
-            className="text-interactive-normal hover:text-interactive-hover mr-4 shrink-0 relative"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          >
-            <Smile size={24} />
-            {showEmojiPicker && (
-              <EmojiPickerPopup
-                position="top-right"
-                onClose={() => setShowEmojiPicker(false)}
-                onEmojiSelect={(emoji) => setMessage(prev => prev + emoji.emoji)}
-              />
-            )}
-          </button>
           <input
             type="text"
             value={message}
@@ -480,6 +466,20 @@ export const DirectMessageView: React.FC = () => {
               }
             }}
           />
+          <button
+            type="button"
+            className="text-interactive-normal hover:text-interactive-hover ml-4 shrink-0 relative"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          >
+            <Smile size={24} />
+            {showEmojiPicker && (
+              <EmojiPickerPopup
+                position="top-right"
+                onClose={() => setShowEmojiPicker(false)}
+                onEmojiSelect={(emoji) => setMessage(prev => prev + emoji.emoji)}
+              />
+            )}
+          </button>
           <button
             type="submit"
             tabIndex={-1}
