@@ -324,10 +324,13 @@ async def handle_add_reaction(sid, data):
             
         await msg.save()
         
+        from app.api.endpoints.messages import _resolve_reactions
+        resolved_reactions = await _resolve_reactions(msg.reactions)
+        
         payload = {
             "messageId": str(msg.id),
             "channelId": str(msg.channelId) if msg_type == "channel" else str(msg.conversationId),
-            "reactions": [{"emoji": r.emoji, "users": r.users} for r in msg.reactions],
+            "reactions": resolved_reactions,
             "type": msg_type
         }
         
@@ -369,10 +372,13 @@ async def handle_remove_reaction(sid, data):
                 msg.reactions.remove(reaction)
             await msg.save()
             
+            from app.api.endpoints.messages import _resolve_reactions
+            resolved_reactions = await _resolve_reactions(msg.reactions)
+            
             payload = {
                 "messageId": str(msg.id),
                 "channelId": str(msg.channelId) if msg_type == "channel" else str(msg.conversationId),
-                "reactions": [{"emoji": r.emoji, "users": r.users} for r in msg.reactions],
+                "reactions": resolved_reactions,
                 "type": msg_type
             }
             

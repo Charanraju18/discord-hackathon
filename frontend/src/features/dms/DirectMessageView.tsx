@@ -154,7 +154,7 @@ export const DirectMessageView: React.FC = () => {
   const toggleReaction = (messageId: string, emoji: string, currentReactions: any[] = []) => {
     if (!socket || !user) return;
     const reaction = currentReactions.find(r => r.emoji === emoji);
-    const hasReacted = reaction?.users.includes(user.id);
+    const hasReacted = reaction?.users?.some((u: any) => (typeof u === 'string' ? u : u.id) === user?.id);
     
     if (hasReacted) {
       socket.emit('remove_reaction', { messageId, emoji, type: 'dm' });
@@ -377,7 +377,7 @@ export const DirectMessageView: React.FC = () => {
                             key={r.emoji}
                             emoji={r.emoji}
                             count={r.users.length}
-                            hasReacted={r.users.includes(user?.id)}
+                            hasReacted={r.users.some((u: any) => (typeof u === 'string' ? u : u.id) === user?.id)}
                             users={r.users}
                             onClick={() => toggleReaction(msg.id, r.emoji, msg.reactions)}
                           />

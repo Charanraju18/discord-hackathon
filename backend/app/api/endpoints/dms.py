@@ -93,10 +93,12 @@ async def get_messages(
         
     messages = await DirectMessage.find({"conversationId": conv_id}).sort("createdAt").to_list()
     
+    from app.api.endpoints.messages import _resolve_reactions
     results = []
     for m in messages:
         sender = await User.get(m.senderId)
         if sender:
+            resolved_reactions = await _resolve_reactions(getattr(m, 'reactions', []))
             results.append({
                 "id": str(m.id),
                 "conversationId": str(m.conversationId),
@@ -107,7 +109,7 @@ async def get_messages(
                 "deleted": m.deleted,
                 "deletedAt": str(m.deletedAt) if m.deletedAt else None,
                 "attachments": [a.model_dump() for a in m.attachments],
-                "reactions": [{"emoji": r.emoji, "users": r.users} for r in getattr(m, 'reactions', [])],
+                "reactions": resolved_reactions,
                 "createdAt": str(m.createdAt) if m.createdAt else None,
                 "updatedAt": str(m.updatedAt) if m.updatedAt else None
             })
@@ -137,6 +139,8 @@ async def send_message(
     await conv.save()
     
     sender = await User.get(current_user.id)
+    from app.api.endpoints.messages import _resolve_reactions
+    resolved_reactions = await _resolve_reactions(getattr(new_msg, 'reactions', []))
     msg_dict = {
         "id": str(new_msg.id),
         "conversationId": str(new_msg.conversationId),
@@ -147,7 +151,7 @@ async def send_message(
         "deleted": new_msg.deleted,
         "deletedAt": str(new_msg.deletedAt) if new_msg.deletedAt else None,
         "attachments": [{"url": a.url, "publicId": a.publicId, "fileName": a.fileName, "fileSize": a.fileSize, "mimeType": a.mimeType, "resourceType": a.resourceType, "uploadedAt": str(a.uploadedAt) if a.uploadedAt else None} for a in new_msg.attachments],
-        "reactions": [{"emoji": r.emoji, "users": r.users} for r in getattr(new_msg, 'reactions', [])],
+        "reactions": resolved_reactions,
         "createdAt": str(new_msg.createdAt),
         "updatedAt": str(new_msg.updatedAt)
     }

@@ -180,15 +180,14 @@ export const ChatArea: React.FC = () => {
     }
   };
 
-  const toggleReaction = (messageId: string, emoji: string, currentReactions: any[] = []) => {
-    if (!socket || !user) return;
-    const reaction = currentReactions.find(r => r.emoji === emoji);
-    const hasReacted = reaction?.users.includes(user.id);
+  const toggleReaction = (messageId: string, emoji: string, currentReactions: any[]) => {
+    const reaction = currentReactions?.find(r => r.emoji === emoji);
+    const hasReacted = reaction?.users?.some((u: any) => (typeof u === 'string' ? u : u.id) === user?.id);
     
     if (hasReacted) {
-      socket.emit('remove_reaction', { messageId, emoji, type: 'channel' });
+      socket?.emit('remove_reaction', { messageId, emoji, type: 'channel' });
     } else {
-      socket.emit('add_reaction', { messageId, emoji, type: 'channel' });
+      socket?.emit('add_reaction', { messageId, emoji, type: 'channel' });
     }
   };
 
@@ -410,8 +409,8 @@ export const ChatArea: React.FC = () => {
                             key={r.emoji}
                             emoji={r.emoji}
                             count={r.users.length}
-                            hasReacted={r.users.includes(user?.id)}
-                            users={r.users} // Ideally we map userIds to usernames here if possible, for now just IDs
+                            hasReacted={r.users.some((u: any) => (typeof u === 'string' ? u : u.id) === user?.id)}
+                            users={r.users}
                             onClick={() => toggleReaction(msg.id, r.emoji, msg.reactions)}
                           />
                         ))}

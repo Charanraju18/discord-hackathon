@@ -22,13 +22,17 @@ export const ReactionBadge: React.FC<ReactionBadgeProps> = ({ emoji, count, hasR
       <span className="font-medium">{count}</span>
 
       {/* Tooltip on hover */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-black rounded shadow-lg text-white text-xs opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-black rounded shadow-lg text-white text-xs opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity min-w-max z-50">
         <div className="font-semibold mb-1">{emoji}</div>
-        {users.length > 3 ? (
-          <div>{users.slice(0, 3).join(', ')} and {users.length - 3} others</div>
-        ) : (
-          <div>{users.join(', ')}</div>
-        )}
+        <div className="flex flex-wrap gap-1 items-center">
+          {users.slice(0, 5).map((u: any, idx) => (
+            <React.Fragment key={typeof u === 'string' ? u : u.id}>
+              {idx > 0 && <span>•</span>}
+              <span>{typeof u === 'string' ? u : u.username}</span>
+            </React.Fragment>
+          ))}
+          {users.length > 5 && <span>and {users.length - 5} others</span>}
+        </div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black"></div>
       </div>
     </button>
