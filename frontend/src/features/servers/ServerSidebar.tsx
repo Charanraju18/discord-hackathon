@@ -26,8 +26,9 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
         { name: newServerName },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      if (res.data.success) {
-        onServerCreated(res.data.data);
+      // FastAPI returns server object directly
+      if (res.data && res.data.id) {
+        onServerCreated(res.data);
         setShowModal(false);
         setNewServerName("");
       }
@@ -53,8 +54,8 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
 
       {servers.map((server) => (
         <NavLink
-          key={server._id}
-          to={`/channels/${server._id}`}
+          key={server.id}
+          to={`/channels/${server.id}`}
           className={({ isActive }) =>
             `w-12 h-12 rounded-[24px] flex items-center justify-center bg-background text-white transition-all duration-200 hover:rounded-[16px] hover:bg-primary ${isActive ? "bg-primary rounded-[16px]" : ""}`
           }

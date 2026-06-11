@@ -2,10 +2,11 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../config';
 
-interface User {
-  _id: string;
+export interface User {
+  id: string;
   username: string;
   email: string;
+  isOnline?: boolean;
   token?: string;
 }
 
@@ -30,8 +31,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const res = await axios.get(`${API_BASE_URL}/api/auth/me`, {
             headers: { Authorization: `Bearer ${token}` }
           });
-          if (res.data.success) {
-            setUser({ ...res.data.data, token });
+          // FastAPI returns UserResponse directly (no success wrapper)
+          if (res.data && res.data.id) {
+            setUser({ ...res.data, token });
           } else {
             localStorage.removeItem('token');
           }

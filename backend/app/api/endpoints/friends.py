@@ -48,27 +48,32 @@ async def send_request(
 
 @router.get("/requests")
 async def get_requests(current_user: User = Depends(get_current_user)):
-    # Get requests where user is sender or receiver
     requests = await FriendRequest.find({
         "$or": [
             {"senderId": current_user.id},
             {"receiverId": current_user.id}
         ]
     }).to_list()
-    
-    # Manually populate sender and receiver
-    populated_requests = []
+
+    incoming = []
+    outgoing = []
     for r in requests:
         sender = await User.get(r.senderId)
         receiver = await User.get(r.receiverId)
-        if sender and receiver:
-            populated_requests.append({
-                "id": str(r.id),
-                "sender": sender,
-                "receiver": receiver,
-                "createdAt": r.createdAt
-            })
-    return populated_requests
+        if not sender or not receiver:
+            continue
+        req_data = {
+            "id": str(r.id),
+            "sender": {"id": str(sender.id), "username": sender.username, "isOnline": sender.isOnline},
+            "receiver": {"id": str(receiver.id), "username": receiver.username, "isOnline": receiver.isOnline},
+            "createdAt": r.createdAt
+        }
+        if r.receiverId == current_user.id:
+            incoming.append(req_data)
+        else:
+            outgoing.append(req_data)
+
+    return {"incoming": incoming, "outgoing": outgoing, "incomingCount": len(incoming)}
 
 @router.post("/request/{request_id}/accept")
 async def accept_request(
@@ -105,7 +110,7 @@ async def reject_request(
     await req.delete()
     return {"message": "Friend request rejected"}
 
-@router.get("/")
+@router.get("")
 async def get_friends(current_user: User = Depends(get_current_user)):
     friendships = await Friendship.find({
         "$or": [
@@ -113,7 +118,7 @@ async def get_friends(current_user: User = Depends(get_current_user)):
             {"userTwoId": current_user.id}
         ]
     }).to_list()
-    
+
     populated_friends = []
     for f in friendships:
         friend_id = f.userTwoId if f.userOneId == current_user.id else f.userOneId
@@ -121,7 +126,13 @@ async def get_friends(current_user: User = Depends(get_current_user)):
         if friend:
             populated_friends.append({
                 "id": str(f.id),
-                "friend": friend,
+                "friend": {
+                    "id": str(friend.id),
+                    "username": friend.username,
+                    "email": friend.email,
+                    "isOnline": friend.isOnline,
+                    "lastSeen": friend.lastSeen
+                },
                 "createdAt": f.createdAt
             })
     return populated_friends

@@ -21,37 +21,30 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     if (!user) return;
-
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const newSocket = io(`${API_BASE_URL}`, {
-      auth: {
-        token
-      }
-    });
+    const newSocket = io(`${API_BASE_URL}`, { auth: { token } });
 
     newSocket.on('connect', () => {
       setIsConnected(true);
+      // Register this socket session with the backend so it can map sid → userId
+      newSocket.emit('setup', user.id);
     });
 
+    // Backend emits `presence` with { userId, isOnline }
+    newSocket.on('presence', ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
+      if (isOnline) {
+        setOnlineUsers(prev => prev.includes(userId) ? prev : [...prev, userId]);
+      } else {
+        setOnlineUsers(prev => prev.filter(id => id !== userId));
+      }
+      setPresenceOverrides(prev => ({ ...prev, [userId]: isOnline }));
+    });
+
+    // Legacy full sync (kept for compatibility)
     newSocket.on('online-users', (users: string[]) => {
-      setOnlineUsers(users); // Keep legacy full sync just in case
-    });
-
-    newSocket.on('user:online', ({ userId }: { userId: string }) => {
-      setOnlineUsers(prev => {
-        if (!prev.includes(userId)) {
-          return [...prev, userId];
-        }
-        return prev;
-      });
-      setPresenceOverrides(prev => ({ ...prev, [userId]: true }));
-    });
-
-    newSocket.on('user:offline', ({ userId }: { userId: string }) => {
-      setOnlineUsers(prev => prev.filter(id => id !== userId));
-      setPresenceOverrides(prev => ({ ...prev, [userId]: false }));
+      setOnlineUsers(users);
     });
 
     newSocket.on('disconnect', () => {
@@ -61,10 +54,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     setSocket(newSocket);
-
-    return () => {
-      newSocket.close();
-    };
+    return () => { newSocket.close(); };
   }, [user]);
 
   return (

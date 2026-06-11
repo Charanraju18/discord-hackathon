@@ -13,79 +13,49 @@ from app.api.deps import get_current_user
 
 router = APIRouter()
 
-@router.get("/")
+def _user_dict(u: User) -> dict:
+    return {"id": str(u.id), "username": u.username, "email": u.email, "isOnline": u.isOnline}
+
+def _channel_dict(c: Channel) -> dict:
+    return {"id": str(c.id), "serverId": str(c.serverId), "name": c.name, "type": c.type,
+            "createdAt": str(c.createdAt), "updatedAt": str(c.updatedAt)}
+
+def _server_dict(s: Server, members: list, channels: list) -> dict:
+    return {
+        "id": str(s.id),
+        "name": s.name,
+        "icon": s.icon,
+        "ownerId": str(s.ownerId),
+        "members": members,
+        "channels": channels,
+        "createdAt": str(s.createdAt),
+        "updatedAt": str(s.updatedAt)
+    }
+
+@router.get("")
 async def get_servers(current_user: User = Depends(get_current_user)):
     servers = await Server.find({"members": current_user.id}).to_list()
     results = []
     for s in servers:
-        s_dict = s.model_dump()
-        s_dict['id'] = str(s.id)
-        
-        # Populate members manually for response if needed
-        populated_members = []
+        members = []
         for m_id in s.members:
             u = await User.get(m_id)
             if u:
-                populated_members.append({
-                    "userId": u.model_dump(),
-                    "role": "member", # Simplified as role is not stored in members array
-                    "joinedAt": str(datetime.utcnow()) # Defaulting since joinedAt is not stored
-                })
-        s_dict['members'] = populated_members
-        
-        # Get channels
+                members.append({"userId": _user_dict(u), "role": "member", "joinedAt": str(datetime.utcnow())})
         channels = await Channel.find({"serverId": s.id}).to_list()
-        s_dict['channels'] = [
-            {
-                "id": str(c.id),
-                "serverId": str(c.serverId),
-                "name": c.name,
-                "type": c.type,
-                "createdAt": str(c.createdAt),
-                "updatedAt": str(c.updatedAt)
-            } for c in channels
-        ]
-        results.append(s_dict)
+        results.append(_server_dict(s, members, [_channel_dict(c) for c in channels]))
     return results
 
-@router.post("/")
-async def create_server(
-    req: ServerCreate,
-    current_user: User = Depends(get_current_user)
-):
-    new_server = Server(
-        name=req.name,
-        icon=req.icon,
-        ownerId=current_user.id,
-        members=[current_user.id]
-    )
+@router.post("")
+async def create_server(req: ServerCreate, current_user: User = Depends(get_current_user)):
+    new_server = Server(name=req.name, icon=req.icon, ownerId=current_user.id, members=[current_user.id])
     await new_server.insert()
-    
-    # Default channel
-    default_channel = Channel(
-        serverId=new_server.id,
-        name="general",
-        type="text"
-    )
+
+    default_channel = Channel(serverId=new_server.id, name="general", type="text")
     await default_channel.insert()
-    
-    # Build response
-    s_dict = new_server.model_dump()
-    s_dict['id'] = str(new_server.id)
-    s_dict['members'] = [{
-        "userId": current_user.model_dump(),
-        "role": "owner",
-        "joinedAt": str(datetime.utcnow())
-    }]
-    s_dict['channels'] = [{
-        "id": str(default_channel.id),
-        "serverId": str(default_channel.serverId),
-        "name": default_channel.name,
-        "type": default_channel.type,
-        "createdAt": str(default_channel.createdAt),
-        "updatedAt": str(default_channel.updatedAt)
-    }]
-    return s_dict
+
+    members = [{"userId": _user_dict(current_user), "role": "owner", "joinedAt": str(datetime.utcnow())}]
+    return _server_dict(new_server, members, [_channel_dict(default_channel)])
 
 @router.post("/{server_id}/join")
 async def join_server(

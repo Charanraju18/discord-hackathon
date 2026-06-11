@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, NavLink, useNavigate } from 'react-router-dom';
+import { useParams, NavLink } from 'react-router-dom';
 import axios from 'axios';
-import { Hash, Plus, Settings, UserPlus, ChevronDown } from 'lucide-react';
+import { Hash, Plus, UserPlus } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { InviteModal } from '../servers/InviteModal';
 import { UserInviteModal } from '../invitations/UserInviteModal';
 import { API_BASE_URL } from '../../config';
 
@@ -15,7 +14,6 @@ export const ChannelSidebar: React.FC = () => {
   const [showUserInviteModal, setShowUserInviteModal] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchChannels = async () => {
@@ -24,26 +22,24 @@ export const ChannelSidebar: React.FC = () => {
         const res = await axios.get(`${API_BASE_URL}/api/channels/${serverId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (res.data.success) {
-          setChannels(res.data.data);
-        }
+        // FastAPI returns array directly
+        setChannels(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error('Failed to fetch channels', err);
       }
     };
-    
-    // Quick fetch to get server name (in MVP we can just use a generic fetch or let InviteModal handle it)
+
     const fetchServer = async () => {
-       try {
-          const token = localStorage.getItem('token');
-          const res = await axios.get(`${API_BASE_URL}/api/servers`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (res.data.success) {
-             const found = res.data.data.find((s: any) => s._id === serverId);
-             if (found) setServer(found);
-          }
-       } catch (err) {}
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`${API_BASE_URL}/api/servers`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        // FastAPI returns array directly; server uses `id` not `_id`
+        const list = Array.isArray(res.data) ? res.data : [];
+        const found = list.find((s: any) => s.id === serverId);
+        if (found) setServer(found);
+      } catch (err) {}
     };
 
     if (serverId) {
@@ -56,12 +52,13 @@ export const ChannelSidebar: React.FC = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post(`${API_BASE_URL}/api/channels`, 
+      const res = await axios.post(`${API_BASE_URL}/api/channels`,
         { name: newChannelName, serverId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (res.data.success) {
-        setChannels([...channels, res.data.data]);
+      // FastAPI returns channel object directly
+      if (res.data && res.data.id) {
+        setChannels([...channels, res.data]);
         setShowChannelModal(false);
         setNewChannelName('');
       }
@@ -73,13 +70,10 @@ export const ChannelSidebar: React.FC = () => {
   return (
     <div className="flex flex-col h-full w-full bg-channel-bg">
       {/* Server Header */}
-      <div className="h-12 border-b border-divider flex items-center justify-between px-4 font-bold text-white shadow-sm cursor-pointer hover:bg-white/5 transition-colors group">
+      <div className="h-12 border-b border-divider flex items-center justify-between px-4 font-bold text-white shadow-sm cursor-pointer hover:bg-white/5 transition-colors">
         <span className="truncate">{server ? server.name : 'Server'}</span>
-        <button 
-          onClick={(e) => {
-             e.stopPropagation();
-             setShowUserInviteModal(true);
-          }}
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowUserInviteModal(true); }}
           className="text-text-muted hover:text-white transition-colors p-1 flex items-center justify-center rounded"
           title="Invite People"
         >
@@ -89,17 +83,22 @@ export const ChannelSidebar: React.FC = () => {
 
       {/* Channel List */}
       <div className="flex-1 overflow-y-auto py-3 px-2 custom-scrollbar">
-        <div className="flex items-center justify-between text-text-muted hover:text-text-normal mb-1 px-2 group cursor-pointer" onClick={() => setShowChannelModal(true)}>
+        <div
+          className="flex items-center justify-between text-text-muted hover:text-text-normal mb-1 px-2 group cursor-pointer"
+          onClick={() => setShowChannelModal(true)}
+        >
           <span className="text-xs font-bold uppercase tracking-wider">Text Channels</span>
           <Plus size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
-        
+
         <div className="space-y-[2px]">
           {channels.map((channel) => (
             <NavLink
-              key={channel._id}
-              to={`/channels/${serverId}/${channel._id}`}
-              className={({ isActive }) => `flex items-center px-2 py-1.5 rounded text-text-muted hover:bg-white/5 hover:text-interactive-hover transition-colors ${isActive ? 'bg-white/10 text-interactive-active' : ''}`}
+              key={channel.id}
+              to={`/channels/${serverId}/${channel.id}`}
+              className={({ isActive }) =>
+                `flex items-center px-2 py-1.5 rounded text-text-muted hover:bg-white/5 hover:text-interactive-hover transition-colors ${isActive ? 'bg-white/10 text-interactive-active' : ''}`
+              }
             >
               <Hash size={20} className="mr-1.5 text-text-muted" />
               <span className="font-medium truncate">{channel.name}</span>
@@ -107,8 +106,6 @@ export const ChannelSidebar: React.FC = () => {
           ))}
         </div>
       </div>
-
-      {/* The User Area has been moved to UserPanel.tsx in SecondarySidebarLayout */}
 
       {/* Create Channel Modal */}
       {showChannelModal && (
@@ -119,9 +116,7 @@ export const ChannelSidebar: React.FC = () => {
               <button onClick={() => setShowChannelModal(false)} className="text-text-muted hover:text-white">✕</button>
             </div>
             <form onSubmit={handleCreateChannel}>
-              <label className="block text-xs font-bold text-text-muted uppercase mb-2">
-                Channel Name
-              </label>
+              <label className="block text-xs font-bold text-text-muted uppercase mb-2">Channel Name</label>
               <div className="relative mb-6">
                 <Hash size={16} className="absolute left-2.5 top-3 text-text-muted" />
                 <input
@@ -134,24 +129,20 @@ export const ChannelSidebar: React.FC = () => {
                 />
               </div>
               <div className="flex justify-between items-center bg-channel-bg -mx-6 -mb-6 p-4 rounded-b-lg">
-                <button type="button" onClick={() => setShowChannelModal(false)} className="text-text-normal hover:underline text-sm">
-                  Cancel
-                </button>
-                <button type="submit" className="bg-primary text-white px-6 py-2 rounded font-medium hover:bg-primary-hover transition-colors">
-                  Create Channel
-                </button>
+                <button type="button" onClick={() => setShowChannelModal(false)} className="text-text-normal hover:underline text-sm">Cancel</button>
+                <button type="submit" className="bg-primary text-white px-6 py-2 rounded font-medium hover:bg-primary-hover transition-colors">Create Channel</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* User Invite Modal */}
+      {/* User Invite Modal — server.id is used (FastAPI returns `id` not `_id`) */}
       {showUserInviteModal && server && (
-        <UserInviteModal 
-          serverId={server._id} 
-          serverName={server.name} 
-          onClose={() => setShowUserInviteModal(false)} 
+        <UserInviteModal
+          serverId={server.id}
+          serverName={server.name}
+          onClose={() => setShowUserInviteModal(false)}
         />
       )}
     </div>

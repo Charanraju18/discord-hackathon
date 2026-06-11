@@ -14,6 +14,26 @@ from app.sockets import sio
 
 router = APIRouter()
 
+def _friend_dict(user) -> dict:
+    return {
+        "id": str(user.id),
+        "username": user.username,
+        "email": user.email,
+        "isOnline": user.isOnline,
+        "lastSeen": user.lastSeen
+    }
+
+def _conv_response(conv, participants: list, current_user_id) -> dict:
+    friend = next((p for p in participants if str(p.id) != str(current_user_id)), None)
+    return {
+        "id": str(conv.id),
+        "participants": [_friend_dict(p) for p in participants],
+        "friend": _friend_dict(friend) if friend else None,
+        "lastMessageId": str(conv.lastMessageId) if conv.lastMessageId else None,
+        "createdAt": conv.createdAt,
+        "updatedAt": conv.updatedAt
+    }
+
 @router.post("/start")
 async def start_conversation(
     req: StartDMRequest,
@@ -29,57 +49,22 @@ async def start_conversation(
     })
     
     if conv:
-        # Populate participants
-        participants = []
-        for pid in conv.participants:
-            p_user = await User.get(pid)
-            if p_user:
-                participants.append(p_user)
-        
-        return {
-            "id": str(conv.id),
-            "participants": participants,
-            "lastMessageId": str(conv.lastMessageId) if conv.lastMessageId else None,
-            "createdAt": conv.createdAt,
-            "updatedAt": conv.updatedAt
-        }
-        
-    # Create new conversation
+        participants = [p for pid in conv.participants if (p := await User.get(pid))]
+        return _conv_response(conv, participants, current_user.id)
+
     new_conv = DirectConversation(participants=[current_user.id, friend_id])
     await new_conv.insert()
-    
-    participants = []
-    for pid in new_conv.participants:
-        p_user = await User.get(pid)
-        if p_user:
-            participants.append(p_user)
-            
-    return {
-        "id": str(new_conv.id),
-        "participants": participants,
-        "lastMessageId": None,
-        "createdAt": new_conv.createdAt,
-        "updatedAt": new_conv.updatedAt
-    }
+    participants = [p for pid in new_conv.participants if (p := await User.get(pid))]
+    return _conv_response(new_conv, participants, current_user.id)
 
-@router.get("/")
+@router.get("")
 async def get_conversations(current_user: User = Depends(get_current_user)):
     conversations = await DirectConversation.find({"participants": current_user.id}).sort("-updatedAt").to_list()
     
     results = []
     for conv in conversations:
-        participants = []
-        for pid in conv.participants:
-            p_user = await User.get(pid)
-            if p_user:
-                participants.append(p_user)
-        results.append({
-            "id": str(conv.id),
-            "participants": participants,
-            "lastMessageId": str(conv.lastMessageId) if conv.lastMessageId else None,
-            "createdAt": conv.createdAt,
-            "updatedAt": conv.updatedAt
-        })
+        participants = [p for pid in conv.participants if (p := await User.get(pid))]
+        results.append(_conv_response(conv, participants, current_user.id))
     return results
 
 @router.get("/{conversation_id}/messages")
@@ -101,7 +86,7 @@ async def get_messages(
             results.append({
                 "id": str(m.id),
                 "conversationId": str(m.conversationId),
-                "sender": sender,
+                "sender": _friend_dict(sender),
                 "content": m.content,
                 "isEdited": m.isEdited,
                 "editedAt": m.editedAt,
@@ -140,7 +125,7 @@ async def send_message(
     msg_dict = {
         "id": str(new_msg.id),
         "conversationId": str(new_msg.conversationId),
-        "sender": sender.model_dump() if sender else None,
+        "sender": _friend_dict(sender) if sender else None,
         "content": new_msg.content,
         "isEdited": new_msg.isEdited,
         "editedAt": str(new_msg.editedAt) if new_msg.editedAt else None,

@@ -14,9 +14,8 @@ export const DirectMessagesSidebar: React.FC = () => {
       const res = await axios.get(`${API_BASE_URL}/api/dms`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.data.success) {
-        setConversations(res.data.data);
-      }
+      // FastAPI returns array directly; each entry has { id, friend: {...}, participants, ... }
+      setConversations(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Failed to fetch DMs', err);
     }
@@ -29,36 +28,35 @@ export const DirectMessagesSidebar: React.FC = () => {
   useEffect(() => {
     if (!socket) return;
     const handleNewMessage = () => fetchConversations();
-    // Re-fetch on any generic notification to keep unread badges updated.
     socket.on('notification-created', handleNewMessage);
-    return () => {
-      socket.off('notification-created', handleNewMessage);
-    };
+    return () => { socket.off('notification-created', handleNewMessage); };
   }, [socket]);
 
   return (
     <div className="flex flex-col flex-1 overflow-y-auto w-full custom-scrollbar">
-      <div className="px-4 py-2 mt-2">
-        <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2 flex justify-between items-center group">
+      <div className="px-4 py-2">
+        <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2 flex justify-between items-center">
           Direct Messages
         </h3>
-        
+
         {conversations.length === 0 ? (
           <div className="text-xs text-text-muted italic px-2 py-1">No active DMs</div>
         ) : (
-          <div className="space-y-[2px]">
+          <div className="space-y-0.5">
             {conversations.map((conv) => {
               const friend = conv.friend;
               if (!friend) return null;
-              
-              const isOverride = presenceOverrides[friend._id];
-              const isOnline = isOverride !== undefined ? isOverride : (onlineUsers.includes(friend._id) || friend.isOnline);
+
+              const isOverride = presenceOverrides[friend.id];
+              const isOnline = isOverride !== undefined
+                ? isOverride
+                : (onlineUsers.includes(friend.id) || friend.isOnline);
 
               return (
                 <NavLink
-                  key={conv._id}
-                  to={`/channels/@me/${conv._id}`}
-                  className={({ isActive }) => 
+                  key={conv.id}
+                  to={`/channels/@me/${conv.id}`}
+                  className={({ isActive }) =>
                     `flex items-center px-2 py-1.5 rounded text-text-muted hover:bg-white/5 hover:text-interactive-hover transition-colors ${isActive ? 'bg-white/10 text-interactive-active' : ''}`
                   }
                 >
@@ -67,11 +65,8 @@ export const DirectMessagesSidebar: React.FC = () => {
                     <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#2b2d31] ${isOnline ? 'bg-[#23a559]' : 'bg-[#80848e]'}`} />
                   </div>
                   <div className="flex-1 truncate">
-                    <span className="font-medium truncate block leading-tight">{friend.username}</span>
+                    <span className="font-medium truncate block leading-tight text-sm">{friend.username}</span>
                   </div>
-                  {conv.unread && (
-                    <div className="w-2 h-2 bg-[#f23f42] rounded-full shrink-0 ml-2" />
-                  )}
                 </NavLink>
               );
             })}

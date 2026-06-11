@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
 
-app = FastAPI(title="Discord Clone API", lifespan=lifespan)
+app = FastAPI(title="Discord Clone API", lifespan=lifespan, redirect_slashes=False)
 
 # CORS
 app.add_middleware(

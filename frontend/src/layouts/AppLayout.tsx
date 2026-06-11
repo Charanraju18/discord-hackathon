@@ -20,32 +20,18 @@ const ServerLayout = () => (
   </>
 );
 
-const MeLayout = () => {
-  const [activeTab, setActiveTab] = useState('online');
-  const [pendingCount, setPendingCount] = useState(0);
-
-  return (
-    <>
-      <SecondarySidebarLayout>
-        <FriendsSidebar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          pendingCount={pendingCount} 
-        />
-        <DirectMessagesSidebar />
-      </SecondarySidebarLayout>
-      <Routes>
-        <Route path="" element={
-          <FriendsDashboard 
-            activeTab={activeTab} 
-            onCountsUpdate={setPendingCount} 
-          />
-        } />
-        <Route path=":conversationId" element={<DirectMessageView />} />
-      </Routes>
-    </>
-  );
-};
+const MeLayout = () => (
+  <>
+    <SecondarySidebarLayout>
+      <FriendsSidebar />
+      <DirectMessagesSidebar />
+    </SecondarySidebarLayout>
+    <Routes>
+      <Route path="" element={<FriendsDashboard />} />
+      <Route path=":conversationId" element={<DirectMessageView />} />
+    </Routes>
+  </>
+);
 
 export const AppLayout: React.FC = () => {
   const [servers, setServers] = useState<any[]>([]);
@@ -57,9 +43,8 @@ export const AppLayout: React.FC = () => {
         const res = await axios.get(`${API_BASE_URL}/api/servers`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (res.data.success) {
-          setServers(res.data.data);
-        }
+        // FastAPI returns array directly (no success wrapper)
+        setServers(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error('Failed to fetch servers', err);
       }
@@ -73,7 +58,7 @@ export const AppLayout: React.FC = () => {
 
       <Routes>
         <Route path="@me/*" element={<MeLayout />} />
-        
+
         <Route path=":serverId" element={<ServerLayout />}>
           <Route path="" element={<div className="flex-1 bg-background flex items-center justify-center text-text-muted">Select a channel</div>} />
           <Route path=":channelId" element={<ChatArea />} />

@@ -6,6 +6,7 @@ from beanie import PydanticObjectId as ObjectId
 class Channel(Document):
     name: str
     serverId: ObjectId
+    type: str = "text"
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
 

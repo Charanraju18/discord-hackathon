@@ -19,11 +19,9 @@ export const Login: React.FC = () => {
     setIsLoading(true);
     try {
       const res = await axios.post(`${API_BASE_URL}/api/auth/login`, { email, password });
-      // In FastAPI, it might return the data directly without `.success` / `.data` wrapper.
-      // So check if res.data.token exists.
-      const data = res.data.data || res.data;
-      if (data.token) {
-        login(data);
+      const data = res.data;
+      if (data.token && data.user) {
+        login({ ...data.user, token: data.token });
         const pendingInvite = localStorage.getItem('pendingInvite');
         if (pendingInvite) {
           navigate(`/invite/${pendingInvite}`);

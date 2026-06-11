@@ -20,9 +20,9 @@ export const Register: React.FC = () => {
     setIsLoading(true);
     try {
       const res = await axios.post(`${API_BASE_URL}/api/auth/register`, { email, username, password });
-      const data = res.data.data || res.data;
-      if (data.token) {
-        login(data);
+      const data = res.data;
+      if (data.token && data.user) {
+        login({ ...data.user, token: data.token });
         const pendingInvite = localStorage.getItem('pendingInvite');
         if (pendingInvite) {
           navigate(`/invite/${pendingInvite}`);
