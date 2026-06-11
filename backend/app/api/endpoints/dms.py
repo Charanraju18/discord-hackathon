@@ -125,7 +125,7 @@ async def send_message(
         conversationId=conv_id,
         senderId=current_user.id,
         content=msg_in.content,
-        attachments=msg_in.attachments
+        attachments=[a.model_dump() for a in msg_in.attachments]
     )
     await new_msg.insert()
     
