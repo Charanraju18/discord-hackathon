@@ -117,7 +117,8 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     socket.on('voice_state_updated', ({ userId, channelId, state }) => {
-      if (channelId !== currentVoiceChannelId) return;
+      console.log('socket event: voice_state_updated', { userId, channelId, state });
+      if (channelId !== currentVoiceChannelId || userId === user.id) return;
       setParticipants(prev => ({ ...prev, [userId]: state }));
     });
 
