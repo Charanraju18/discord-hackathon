@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useParams } from "react-router-dom";
 import axios from "axios";
 import { Plus } from "lucide-react";
 import { API_BASE_URL } from "../../config";
 import discordIcons from "../../assets/discord-icon.png";
 import { getServerInitials } from "../../utils/serverInitials";
+import { useSocket } from "../socket/SocketContext";
 
 interface ServerSidebarProps {
   servers: any[];
@@ -17,6 +18,8 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [newServerName, setNewServerName] = useState("");
+  const { unreadServers } = useSocket();
+  const { serverId: activeServerId } = useParams<{ serverId?: string }>();
 
   const handleCreateServer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +30,6 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
         { name: newServerName },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      // FastAPI returns server object directly
       if (res.data && res.data.id) {
         onServerCreated(res.data);
         setShowModal(false);
@@ -39,35 +41,66 @@ export const ServerSidebar: React.FC<ServerSidebarProps> = ({
   };
 
   return (
-    <div className="w-[72px] bg-server-bg flex flex-col items-center py-3 gap-2 overflow-y-auto shrink-0 z-20">
+    <div className="w-18 bg-server-bg flex flex-col items-center py-3 gap-2 overflow-y-auto shrink-0 z-20">
+      {/* DM / Home button */}
       <NavLink
         to="/channels/@me"
         className={({ isActive }) =>
-          `w-12 h-12 rounded-[24px] flex items-center justify-center bg-background text-white transition-all duration-200 hover:rounded-[16px] hover:bg-primary ${isActive ? "bg-primary rounded-[16px]" : ""}`
+          `w-12 h-12 rounded-3xl flex items-center justify-center bg-background text-white transition-all duration-200 hover:rounded-2xl hover:bg-primary ${isActive ? "bg-primary rounded-2xl" : ""}`
         }
       >
-        <span className="font-bold text-xl">
-          <img className="w-9! h-9!" src={discordIcons} />
-        </span>
+        <img className="w-9 h-9" src={discordIcons} alt="Home" />
       </NavLink>
 
-      <div className="w-8 h-[2px] bg-divider rounded my-1" />
+      <div className="w-8 h-0.5 bg-divider rounded my-1" />
 
-      {servers.map((server) => (
-        <NavLink
-          key={server.id}
-          to={`/channels/${server.id}`}
-          className={({ isActive }) =>
-            `w-12 h-12 rounded-[24px] flex items-center justify-center bg-background text-white transition-all duration-200 hover:rounded-[16px] hover:bg-primary ${isActive ? "bg-primary rounded-[16px]" : ""}`
-          }
-        >
-          <span className="text-xs font-bold leading-none">{getServerInitials(server.name)}</span>
-        </NavLink>
-      ))}
+      {/* Server icons */}
+      {servers.map((server) => {
+        const unreadCount = unreadServers[server.id] ?? 0;
+        const isActive = activeServerId === server.id;
 
+        return (
+          <NavLink
+            key={server.id}
+            to={`/channels/${server.id}`}
+            className="relative flex items-center group"
+          >
+            {/* Discord-style left pill indicator */}
+            <div
+              className={`absolute -left-3 w-1 rounded-r bg-white transition-all duration-200 ${
+                isActive
+                  ? "h-10"                         // full pill when active
+                  : unreadCount > 0
+                  ? "h-2 group-hover:h-5"          // short pill for unread, grows on hover
+                  : "h-0 group-hover:h-5"          // invisible, appears on hover
+              }`}
+            />
+
+            {/* Server icon */}
+            <div
+              className={`w-12 h-12 rounded-3xl flex items-center justify-center bg-background text-white transition-all duration-200 hover:rounded-2xl hover:bg-primary relative ${
+                isActive ? "bg-primary rounded-2xl" : ""
+              } ${unreadCount > 0 && !isActive ? "ring-2 ring-white/20" : ""}`}
+            >
+              <span className="text-xs font-bold leading-none select-none">
+                {getServerInitials(server.name)}
+              </span>
+
+              {/* Unread count badge — top-right */}
+              {unreadCount > 0 && !isActive && (
+                <div className="absolute -top-1 -right-1 min-w-4 h-4 bg-[#f23f42] rounded-full flex items-center justify-center text-[9px] font-bold text-white px-1 border-2 border-server-bg">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </div>
+              )}
+            </div>
+          </NavLink>
+        );
+      })}
+
+      {/* Add server */}
       <button
         onClick={() => setShowModal(true)}
-        className="w-12 h-12 rounded-[24px] flex items-center justify-center bg-background text-[#23a559] transition-all duration-200 hover:rounded-[16px] hover:bg-[#23a559] hover:text-white"
+        className="w-12 h-12 rounded-3xl flex items-center justify-center bg-background text-[#23a559] transition-all duration-200 hover:rounded-2xl hover:bg-[#23a559] hover:text-white"
       >
         <Plus size={24} />
       </button>

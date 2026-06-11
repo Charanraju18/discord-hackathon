@@ -21,7 +21,7 @@ export const ChatArea: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { socket } = useSocket();
+  const { socket, setActiveChannelId } = useSocket();
   const { user } = useAuth();
   let typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -60,10 +60,9 @@ export const ChatArea: React.FC = () => {
     };
 
     fetchMessagesAndChannel();
+    if (channelId) setActiveChannelId(channelId);
 
     if (socket && channelId) {
-      socket.emit('join-channel', channelId);
-
       const handleReceiveMessage = (newMessage: any) => {
         if (newMessage.channelId === channelId) {
           setMessages(prev => {
@@ -126,6 +125,7 @@ export const ChatArea: React.FC = () => {
         socket.off('user-stop-typing', handleUserStopTyping);
         socket.off('message-updated', handleMessageUpdated);
         socket.off('message-deleted', handleMessageDeleted);
+        setActiveChannelId(null);
       };
     }
   }, [channelId, socket, user?.username]);
@@ -281,9 +281,9 @@ export const ChatArea: React.FC = () => {
           </div>
 
           <div className="flex flex-col space-y-4">
-            {messages.map((msg, idx) => {
+            {messages.filter(m => !m.deleted && !m._deleted).map((msg, idx, arr) => {
               // FastAPI returns msg.sender (not msg.senderId)
-              const prevSenderId = idx > 0 ? messages[idx - 1].sender?.id : null;
+              const prevSenderId = idx > 0 ? arr[idx - 1].sender?.id : null;
               const isSameSenderAsPrev = prevSenderId === msg.sender?.id;
 
               return (

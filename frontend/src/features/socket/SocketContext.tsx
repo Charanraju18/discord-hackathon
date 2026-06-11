@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../auth/AuthContext';
 import { API_BASE_URL } from '../../config';
@@ -8,10 +8,20 @@ interface SocketContextType {
   isConnected: boolean;
   onlineUsers: string[];
   presenceOverrides: Record<string, boolean>;
-  // Unread DM tracking
+
+  // DM unreads — red badge on DM avatar
   unreadDMs: Record<string, number>;
   markDMRead: (conversationId: string) => void;
   setActiveDMConversation: (id: string | null) => void;
+
+  // Channel unreads — bold channel name + dot
+  unreadChannels: Record<string, number>;
+  markChannelRead: (channelId: string) => void;
+  setActiveChannelId: (id: string | null) => void;
+  registerChannelServer: (channelId: string, serverId: string) => void;
+
+  // Server unreads — white pill on server icon left edge + count badge
+  unreadServers: Record<string, number>;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -22,10 +32,32 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isConnected, setIsConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [presenceOverrides, setPresenceOverrides] = useState<Record<string, boolean>>({});
+
+  // DM unread state
   const [unreadDMs, setUnreadDMs] = useState<Record<string, number>>({});
   const activeDMConvRef = useRef<string | null>(null);
 
-  const markDMRead = (conversationId: string) => {
+  // Channel unread state
+  const [unreadChannels, setUnreadChannels] = useState<Record<string, number>>({});
+  const activeChannelRef = useRef<string | null>(null);
+
+  // Channel → Server mapping (built from incoming socket events + explicit registration)
+  const [channelServerMap, setChannelServerMap] = useState<Record<string, string>>({});
+
+  // Derived: server unread counts from channel unreads + the mapping
+  const unreadServers = useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const [channelId, count] of Object.entries(unreadChannels)) {
+      const serverId = channelServerMap[channelId];
+      if (serverId && count > 0) {
+        result[serverId] = (result[serverId] ?? 0) + count;
+      }
+    }
+    return result;
+  }, [unreadChannels, channelServerMap]);
+
+  // ── DM helpers ────────────────────────────────────────────────────────────
+  const markDMRead = useCallback((conversationId: string) => {
     activeDMConvRef.current = conversationId;
     setUnreadDMs(prev => {
       if (!prev[conversationId]) return prev;
@@ -33,9 +65,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       delete next[conversationId];
       return next;
     });
-  };
+  }, []);
 
-  const setActiveDMConversation = (id: string | null) => {
+  const setActiveDMConversation = useCallback((id: string | null) => {
     activeDMConvRef.current = id;
     if (id) {
       setUnreadDMs(prev => {
@@ -45,8 +77,38 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return next;
       });
     }
-  };
+  }, []);
 
+  // ── Channel helpers ───────────────────────────────────────────────────────
+  const markChannelRead = useCallback((channelId: string) => {
+    activeChannelRef.current = channelId;
+    setUnreadChannels(prev => {
+      if (!prev[channelId]) return prev;
+      const next = { ...prev };
+      delete next[channelId];
+      return next;
+    });
+  }, []);
+
+  const setActiveChannelId = useCallback((id: string | null) => {
+    activeChannelRef.current = id;
+    if (id) {
+      setUnreadChannels(prev => {
+        if (!prev[id]) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
+  }, []);
+
+  const registerChannelServer = useCallback((channelId: string, serverId: string) => {
+    setChannelServerMap(prev =>
+      prev[channelId] === serverId ? prev : { ...prev, [channelId]: serverId }
+    );
+  }, []);
+
+  // ── Socket setup ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     const token = localStorage.getItem('token');
@@ -54,10 +116,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const newSocket = io(`${API_BASE_URL}`, { auth: { token } });
 
-    newSocket.on('connect', () => {
+    const handleConnect = () => {
       setIsConnected(true);
       newSocket.emit('setup', user.id);
-    });
+    };
+
+    newSocket.on('connect', handleConnect);
 
     newSocket.on('presence', ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
       if (isOnline) {
@@ -72,14 +136,31 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setOnlineUsers(users);
     });
 
-    // Track unread DMs — increment only when the conversation isn't currently open
+    // DM unread tracking
     newSocket.on('new_direct_message', (msg: any) => {
       const convId = msg.conversationId;
       const senderId = msg.sender?.id;
-      // Don't count own messages or messages in the active conversation
       if (!convId || senderId === user.id) return;
       if (convId === activeDMConvRef.current) return;
       setUnreadDMs(prev => ({ ...prev, [convId]: (prev[convId] ?? 0) + 1 }));
+    });
+
+    // Channel unread tracking
+    newSocket.on('new-message', (msg: any) => {
+      const channelId = msg.channelId;
+      const serverId = msg.serverId;
+      const senderId = msg.sender?.id;
+      if (!channelId || senderId === user.id) return;
+      if (channelId === activeChannelRef.current) return;
+
+      setUnreadChannels(prev => ({ ...prev, [channelId]: (prev[channelId] ?? 0) + 1 }));
+
+      // Build channel→server map from the event payload
+      if (serverId) {
+        setChannelServerMap(prev =>
+          prev[channelId] === serverId ? prev : { ...prev, [channelId]: serverId }
+        );
+      }
     });
 
     newSocket.on('disconnect', () => {
@@ -95,7 +176,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   return (
     <SocketContext.Provider value={{
       socket, isConnected, onlineUsers, presenceOverrides,
-      unreadDMs, markDMRead, setActiveDMConversation
+      unreadDMs, markDMRead, setActiveDMConversation,
+      unreadChannels, markChannelRead, setActiveChannelId, registerChannelServer,
+      unreadServers,
     }}>
       {children}
     </SocketContext.Provider>

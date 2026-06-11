@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import List
 from beanie import PydanticObjectId as ObjectId
+from beanie.operators import Set
 from datetime import datetime
 
 from app.models.user import User
@@ -89,7 +90,7 @@ async def get_messages(
     if not conv or current_user.id not in conv.participants:
         raise HTTPException(status_code=404, detail="Conversation not found")
         
-    messages = await DirectMessage.find({"conversationId": conv_id}).sort("createdAt").to_list()
+    messages = await DirectMessage.find({"conversationId": conv_id, "deleted": {"$ne": True}}).sort("createdAt").to_list()
     
     results = []
     for m in messages:
@@ -170,11 +171,13 @@ async def edit_message(
     if msg.senderId != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
         
-    msg.content = req.content
-    msg.isEdited = True
-    msg.editedAt = datetime.utcnow()
-    msg.updatedAt = datetime.utcnow()
-    await msg.save()
+    now = datetime.utcnow()
+    await msg.update(Set({
+        DirectMessage.content: req.content,
+        DirectMessage.isEdited: True,
+        DirectMessage.editedAt: now,
+        DirectMessage.updatedAt: now,
+    }))
     
     conv = await DirectConversation.get(msg.conversationId)
     
@@ -200,12 +203,9 @@ async def delete_message(
     if msg.senderId != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
         
-    msg.deleted = True
-    msg.deletedAt = datetime.utcnow()
-    msg.content = "This message has been deleted."
-    msg.updatedAt = datetime.utcnow()
-    await msg.save()
-    
+    now = datetime.utcnow()
+    await msg.update(Set({DirectMessage.deleted: True, DirectMessage.deletedAt: now, DirectMessage.updatedAt: now}))
+
     conv = await DirectConversation.get(msg.conversationId)
     if conv:
         for pid in conv.participants:
@@ -213,5 +213,5 @@ async def delete_message(
             sid = user_to_sid.get(str(pid))
             if sid:
                 await sio.emit("delete_direct_message", {"id": str(msg.id), "conversationId": str(msg.conversationId)}, to=sid)
-                
+
     return {"message": "Message deleted"}

@@ -65,7 +65,9 @@ export const DirectMessageView: React.FC = () => {
     fetchData();
 
     if (socket && conversationId) {
-      socket.emit('dm:join-conversation', { conversationId });
+      const joinConv = () => socket.emit('dm:join-conversation', { conversationId });
+      joinConv();
+      socket.on('connect', joinConv);
 
       const handleReceiveMessage = (msg: any) => {
         if (msg.conversationId === conversationId) {
@@ -110,6 +112,7 @@ export const DirectMessageView: React.FC = () => {
       socket.on('delete_direct_message', handleMessageDeleted);
 
       return () => {
+        socket.off('connect', joinConv);
         socket.off('new_direct_message', handleReceiveMessage);
         socket.off('dm:typing', handleUserTyping);
         socket.off('dm:stop-typing', handleUserStopTyping);
@@ -251,9 +254,9 @@ export const DirectMessageView: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col space-y-4">
-            {messages.map((msg, idx) => {
+            {messages.filter(m => !m.deleted).map((msg, idx, arr) => {
               // msg.sender is { id, username, ... } (from FastAPI)
-              const prevSenderId = idx > 0 ? messages[idx - 1].sender?.id : null;
+              const prevSenderId = idx > 0 ? arr[idx - 1].sender?.id : null;
               const isSameSender = prevSenderId === msg.sender?.id;
               const isOwn = user?.id === msg.sender?.id;
 

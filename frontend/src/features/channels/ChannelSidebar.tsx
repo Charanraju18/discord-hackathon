@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useVoice } from '../rtc/hooks/useWebRTC';
 import { UserInviteModal } from '../invitations/UserInviteModal';
 import { API_BASE_URL } from '../../config';
+import { useSocket } from '../socket/SocketContext';
 
 export const ChannelSidebar: React.FC = () => {
   const { serverId } = useParams<{ serverId: string }>();
@@ -17,6 +18,7 @@ export const ChannelSidebar: React.FC = () => {
   const [newChannelType, setNewChannelType] = useState('text');
   const { user } = useAuth();
   const { joinVoiceChannel, currentVoiceChannelId, participants } = useVoice();
+  const { unreadChannels } = useSocket();
 
   useEffect(() => {
     const fetchChannels = async () => {
@@ -95,19 +97,33 @@ export const ChannelSidebar: React.FC = () => {
           <Plus size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        <div className="space-y-[2px] mb-4">
-          {channels.filter(c => c.type === 'text' || !c.type).map((channel) => (
-            <NavLink
-              key={channel.id}
-              to={`/channels/${serverId}/${channel.id}`}
-              className={({ isActive }) =>
-                `flex items-center px-2 py-1.5 rounded text-text-muted hover:bg-white/5 hover:text-interactive-hover transition-colors ${isActive ? 'bg-white/10 text-interactive-active' : ''}`
-              }
-            >
-              <Hash size={20} className="mr-1.5 text-text-muted" />
-              <span className="font-medium truncate">{channel.name}</span>
-            </NavLink>
-          ))}
+        <div className="space-y-0.5 mb-4">
+          {channels.filter(c => c.type === 'text' || !c.type).map((channel) => {
+            const unread = (unreadChannels[channel.id] ?? 0) > 0;
+            return (
+              <NavLink
+                key={channel.id}
+                to={`/channels/${serverId}/${channel.id}`}
+                className={({ isActive }) =>
+                  `flex items-center px-2 py-1.5 rounded hover:bg-white/5 hover:text-interactive-hover transition-colors ${
+                    isActive
+                      ? 'bg-white/10 text-interactive-active'
+                      : unread
+                      ? 'text-white'
+                      : 'text-text-muted'
+                  }`
+                }
+              >
+                <Hash size={20} className="mr-1.5 shrink-0 text-text-muted" />
+                <span className={`truncate flex-1 ${unread ? 'font-semibold' : 'font-medium'}`}>
+                  {channel.name}
+                </span>
+                {unread && (
+                  <div className="w-2 h-2 rounded-full bg-white shrink-0 ml-1" />
+                )}
+              </NavLink>
+            );
+          })}
         </div>
 
         <div
@@ -118,7 +134,7 @@ export const ChannelSidebar: React.FC = () => {
           <Plus size={16} className="opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        <div className="space-y-[2px]">
+        <div className="space-y-0.5">
           {channels.filter(c => c.type === 'voice').map((channel) => (
             <div key={channel.id}>
               <NavLink

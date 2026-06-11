@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from beanie import PydanticObjectId as ObjectId
+from beanie.operators import Set
 from datetime import datetime
 
 from app.models.user import User
@@ -67,11 +68,13 @@ async def edit_message(
     if msg.deleted:
         raise HTTPException(status_code=400, detail="Cannot edit a deleted message")
         
-    msg.content = req.content
-    msg.isEdited = True
-    msg.editedAt = datetime.utcnow()
-    msg.updatedAt = datetime.utcnow()
-    await msg.save()
+    now = datetime.utcnow()
+    await msg.update(Set({
+        Message.content: req.content,
+        Message.isEdited: True,
+        Message.editedAt: now,
+        Message.updatedAt: now,
+    }))
     
     sender = await User.get(current_user.id)
     payload = _msg_dict(msg, sender)
@@ -92,12 +95,10 @@ async def delete_message(
         
     if msg.deleted:
         raise HTTPException(status_code=400, detail="Message is already deleted")
-        
-    msg.deleted = True
-    msg.deletedAt = datetime.utcnow()
-    await msg.save()
-    
-    sender = await User.get(current_user.id)
-    payload = _msg_dict(msg, sender)
-    await sio.emit("message-deleted", payload, room=str(msg.channelId))
-    return payload
+
+    # Use explicit $set instead of .save() to guarantee persistence in Beanie 1.x
+    now = datetime.utcnow()
+    await msg.update(Set({Message.deleted: True, Message.deletedAt: now, Message.updatedAt: now}))
+
+    await sio.emit("message-deleted", {"id": str(msg.id), "channelId": str(msg.channelId)}, room=str(msg.channelId))
+    return {"id": str(msg.id), "channelId": str(msg.channelId)}

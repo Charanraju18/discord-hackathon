@@ -252,15 +252,15 @@ from app.models.channel import Channel
 
 @sio.on("new-message")
 async def handle_new_message(sid, data):
-    # data: { channelId, serverId, content, attachments, sender: { _id, username, ... } }
     channel_id = data.get("channelId")
+    server_id = data.get("serverId")  # passed by frontend, not stored on Message model
     content = data.get("content", "")
     attachments = data.get("attachments", [])
-    
+
     user_id = sid_to_user.get(sid)
     if not user_id:
         return
-        
+
     try:
         new_msg = Message(
             channelId=ObjectId(channel_id),
@@ -269,13 +269,13 @@ async def handle_new_message(sid, data):
             attachments=attachments
         )
         await new_msg.insert()
-        
+
         sender = await User.get(ObjectId(user_id))
 
         payload = {
             "id": str(new_msg.id),
             "channelId": str(new_msg.channelId),
-            "serverId": str(new_msg.serverId),
+            "serverId": server_id,  # pass through for client-side unread tracking
             "sender": {"id": str(sender.id), "username": sender.username, "email": sender.email, "isOnline": sender.isOnline} if sender else None,
             "content": new_msg.content,
             "isEdited": new_msg.isEdited,
@@ -286,7 +286,7 @@ async def handle_new_message(sid, data):
             "createdAt": str(new_msg.createdAt),
             "updatedAt": str(new_msg.updatedAt)
         }
-        
+
         await sio.emit("new-message", payload, room=str(channel_id))
     except Exception as e:
         print(f"Error handling new message: {e}")

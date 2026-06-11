@@ -5,12 +5,39 @@ import { API_BASE_URL } from '../../config';
 import { ChatArea } from '../chat/ChatArea';
 import { VoiceChannel } from '../rtc/components/VoiceChannel';
 import { useVoice } from '../rtc/hooks/useWebRTC';
+import { useSocket } from '../socket/SocketContext';
 
 export const ChannelRouter: React.FC = () => {
   const { channelId, serverId } = useParams<{ channelId: string; serverId: string }>();
   const [channelType, setChannelType] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const { joinVoiceChannel } = useVoice();
+  const { socket, registerChannelServer } = useSocket();
+
+  // Emit join-channel IMMEDIATELY when channelId changes — before the loading state resolves.
+  // Also re-join on socket reconnect (connect fires on both initial connect and reconnect).
+  useEffect(() => {
+    if (!socket || !channelId) return;
+
+    const joinChannel = () => {
+      socket.emit('join-channel', channelId);
+    };
+
+    joinChannel();
+    socket.on('connect', joinChannel);
+
+    return () => {
+      socket.off('connect', joinChannel);
+      socket.emit('leave-channel', channelId);
+    };
+  }, [socket, channelId]);
+
+  // Register channel→server mapping for unread tracking
+  useEffect(() => {
+    if (channelId && serverId) {
+      registerChannelServer(channelId, serverId);
+    }
+  }, [channelId, serverId, registerChannelServer]);
 
   useEffect(() => {
     const fetchChannelInfo = async () => {
@@ -30,17 +57,17 @@ export const ChannelRouter: React.FC = () => {
               joinVoiceChannel(channel.id || channel._id);
             }
           } else {
-             // Fallback
-             setChannelType('text');
+            setChannelType('text');
           }
         }
       } catch (err) {
         console.error(err);
+        setChannelType('text');
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchChannelInfo();
   }, [channelId, serverId]);
 
