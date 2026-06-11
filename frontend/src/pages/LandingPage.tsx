@@ -246,30 +246,30 @@ export const LandingPage: React.FC = () => {
             <div>
               <h4 className="text-[#5865F2] font-semibold mb-6">Product</h4>
               <ul className="space-y-4 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Download</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Nitro</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Status</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">App Directory</a></li>
+                <li><a href="https://discord.com/download" className="hover:text-white transition-colors">Download</a></li>
+                <li><a href="https://discord.com/nitro" className="hover:text-white transition-colors">Nitro</a></li>
+                <li><a href="https://discordstatus.com/" className="hover:text-white transition-colors">Status</a></li>
+                <li><a href="https://discord.com/apps" className="hover:text-white transition-colors">App Directory</a></li>
               </ul>
             </div>
 
             <div>
               <h4 className="text-[#5865F2] font-semibold mb-6">Company</h4>
               <ul className="space-y-4 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Jobs</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Brand</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Newsroom</a></li>
+                <li><a href="https://discord.com/company" className="hover:text-white transition-colors">About</a></li>
+                <li><a href="https://discord.com/careers" className="hover:text-white transition-colors">Jobs</a></li>
+                <li><a href="https://discord.com/branding" className="hover:text-white transition-colors">Brand</a></li>
+                <li><a href="https://discord.com/newsroom" className="hover:text-white transition-colors">Newsroom</a></li>
               </ul>
             </div>
 
             <div>
               <h4 className="text-[#5865F2] font-semibold mb-6">Policies</h4>
               <ul className="space-y-4 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Terms</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Cookie Settings</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Guidelines</a></li>
+                <li><a href="https://discord.com/terms" className="hover:text-white transition-colors">Terms</a></li>
+                <li><a href="https://discord.com/privacy" className="hover:text-white transition-colors">Privacy</a></li>
+                <li><a href="https://discord.com/cookies" className="hover:text-white transition-colors">Cookie Settings</a></li>
+                <li><a href="https://discord.com/community-guidelines" className="hover:text-white transition-colors">Guidelines</a></li>
               </ul>
             </div>
           </div>
