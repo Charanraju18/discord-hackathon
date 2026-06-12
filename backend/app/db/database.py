@@ -4,7 +4,7 @@ from app.core.config import settings
 from app.models import (
     User, Server, Channel, Message,
     DirectConversation, DirectMessage, FriendRequest,
-    Friendship, ServerInvitation, Invite, Notification
+    Friendship, ServerInvitation, Invite, Notification, Category
 )
 
 async def init_db():
@@ -28,6 +28,7 @@ async def init_db():
             Friendship,
             ServerInvitation,
             Invite,
-            Notification
+            Notification,
+            Category
         ]
     )

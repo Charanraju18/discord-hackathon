@@ -30,7 +30,7 @@ app.add_middleware(
 from app.sockets import sio, events
 socket_app = socketio.ASGIApp(sio, app)
 
-from app.api.endpoints import auth, users, friends, dms, servers, channels, invites, messages, upload
+from app.api.endpoints import auth, users, friends, dms, servers, channels, invites, messages, upload, categories
 
 @app.get("/")
 async def root():
@@ -42,6 +42,7 @@ app.include_router(friends.router, prefix="/api/friends", tags=["friends"])
 app.include_router(dms.router, prefix="/api/dms", tags=["dms"])
 app.include_router(servers.router, prefix="/api/servers", tags=["servers"])
 app.include_router(channels.router, prefix="/api/channels", tags=["channels"])
+app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
 app.include_router(invites.router, prefix="/api/invites", tags=["invites"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
 app.include_router(upload.router, prefix="/api/upload", tags=["upload"])

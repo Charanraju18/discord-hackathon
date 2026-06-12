@@ -9,6 +9,7 @@ from .friendship import Friendship
 from .server_invitation import ServerInvitation
 from .invite import Invite
 from .notification import Notification
+from .category import Category
 
 __all__ = [
     "User",
@@ -23,4 +24,5 @@ __all__ = [
     "ServerInvitation",
     "Invite",
     "Notification",
+    "Category",
 ]

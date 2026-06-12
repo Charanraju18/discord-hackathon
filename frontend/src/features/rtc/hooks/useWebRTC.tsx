@@ -111,6 +111,15 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
     }
 
+    // Guarantee the SDP offer/answer always has a video section.
+    // Without this, a user rejoining with audio-only would produce an offer
+    // with no video m-section, and the peer's active video would be silently
+    // dropped (WebRTC cannot add tracks to a section that wasn't offered).
+    const hasLocalVideo = (localStreamRef.current?.getVideoTracks().length ?? 0) > 0;
+    if (!hasLocalVideo) {
+      pc.addTransceiver('video', { direction: 'recvonly' });
+    }
+
     if (isInitiator) {
       pc.createOffer()
         .then(offer => pc.setLocalDescription(offer))

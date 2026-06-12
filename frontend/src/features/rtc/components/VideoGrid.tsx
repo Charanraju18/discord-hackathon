@@ -35,7 +35,7 @@ export const VideoGrid: React.FC = () => {
             ) : (
               <div className="w-24 h-24 rounded-full bg-[#1e1f22] flex items-center justify-center text-white text-3xl font-bold uppercase">
                 {/* Fallback to avatar, assuming username isn't in participants dict directly, maybe just initial */}
-                {p.isLocal ? user?.username?.[0] : '?'}
+                {(p.isLocal ? user?.username : (p.state as any).username)?.[0]?.toUpperCase() ?? '?'}
               </div>
             )}
             

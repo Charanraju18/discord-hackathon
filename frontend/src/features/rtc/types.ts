@@ -4,6 +4,7 @@ export interface VoiceParticipantState {
   video: boolean;
   screenSharing: boolean;
   sid: string;
+  username?: string;
 }
 
 export interface VoiceRoomState {
